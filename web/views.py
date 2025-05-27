@@ -128,6 +128,25 @@ def job_worker():
 
 threading.Thread(target=job_worker, daemon=True).start()
 
+@app.route('/api/my-dev-dbs')
+def api_my_dev_dbs():
+    if 'user' not in session:
+        return jsonify({"dev_dbs": []})
+
+    username = session['user']
+    dev_dbs = []
+
+    try:
+        conn = get_conn(DEV_SQL)
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sys.databases WHERE name LIKE ?", f"%_dev_{username}")
+        dev_dbs = [row[0] for row in cursor.fetchall()]
+        conn.close()
+    except:
+        pass
+
+    return jsonify({"dev_dbs": dev_dbs})
+
 @app.route('/')
 def index():
     return redirect(url_for('dashboard'))

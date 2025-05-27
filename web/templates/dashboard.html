@@ -139,5 +139,34 @@ function updateProgress(dev_db) {
     updateProgress("{{ dev }}");
 {% endfor %}
 </script>
+<script>
+let previousDevDbs = [];
+
+// Sayfa yüklendikten 5 saniye sonra flag’i temizle
+window.addEventListener("load", () => {
+    setTimeout(() => {
+        localStorage.removeItem("dev_refresh_done");
+    }, 5000);
+});
+
+function refreshDevDbs() {
+    fetch("/api/my-dev-dbs")
+        .then(res => res.json())
+        .then(data => {
+            const current = data.dev_dbs;
+            const added = current.filter(db => !previousDevDbs.includes(db));
+            previousDevDbs = current;
+
+            if (added.length > 0 && !localStorage.getItem("dev_refresh_done")) {
+                console.log("✅ Yeni dev DB bulundu, sayfa 1 kez yenileniyor:", added);
+                localStorage.setItem("dev_refresh_done", "yes");
+                location.reload();
+            }
+        })
+        .catch(err => console.error("Dev DB listesi alınamadı", err));
+}
+
+setInterval(refreshDevDbs, 3000);
+</script>
 </body>
 </html>
