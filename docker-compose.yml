@@ -1,0 +1,11 @@
+version: "3"
+services:
+  dev-db-manager:
+    build: .
+    container_name: dev-db-manager
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./allowed_users.txt:/app/allowed_users.txt
+      - ./app.py:/app/app.py  # 👈 bu satırı ekliyoruz
+    restart: always
