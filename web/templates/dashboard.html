@@ -140,9 +140,8 @@ function updateProgress(dev_db) {
 {% endfor %}
 </script>
 <script>
-let previousDevDbs = [];
+let previousDevDbs = {{ dev_dbs | tojson }};
 
-// Sayfa yüklendikten 5 saniye sonra flag’i temizle
 window.addEventListener("load", () => {
     setTimeout(() => {
         localStorage.removeItem("dev_refresh_done");
@@ -158,7 +157,6 @@ function refreshDevDbs() {
             previousDevDbs = current;
 
             if (added.length > 0 && !localStorage.getItem("dev_refresh_done")) {
-                console.log("✅ Yeni dev DB bulundu, sayfa 1 kez yenileniyor:", added);
                 localStorage.setItem("dev_refresh_done", "yes");
                 location.reload();
             }

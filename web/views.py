@@ -5,6 +5,8 @@ from flask import Flask, request, session, redirect, url_for, render_template, j
 from ldap3 import Server, Connection, ALL, NTLM
 import pyodbc
 import os
+import json
+from web.paths import ALLOWED_USERS_PATH, ADMIN_USERS_PATH, PERMISSIONS_PATH
 
 app = Flask(__name__)
 app.secret_key = 'your-secret-key'
@@ -27,9 +29,9 @@ active_jobs = {}
 
 def is_admin():
     try:
-        with open("admin_users.txt") as f:
-            admins = [line.strip().lower() for line in f.readlines()]
-        return session.get("user", "").lower() in admins
+        with open(ADMIN_USERS_PATH) as f:
+            admins = [line.strip() for line in f]
+        return session.get('user') in admins
     except:
         return False
 
@@ -166,7 +168,7 @@ def login():
             if conn.bind():
                 # Kullanıcı izinli mi kontrol et
                 try:
-                    with open("allowed_users.txt") as f:
+                    with open(ALLOWED_USERS_PATH) as f:
                         allowed_users = [line.strip().lower() for line in f.readlines()]
                 except Exception as e:
                     return f"Yetkili kullanıcı listesi okunamadı: {e}", 500
@@ -196,12 +198,30 @@ def admin_panel():
 
     # allowed_users.txt'yi oku
     try:
-        with open("allowed_users.txt") as f:
+        with open(ALLOWED_USERS_PATH) as f:
             allowed_users = [line.strip() for line in f.readlines()]
     except:
         allowed_users = []
 
-    # Tüm dev veritabanlarını isim + oluşturulma tarihi ile al
+    # user_permissions.json içeriğini oku
+    try:
+        with open(PERMISSIONS_PATH, "r") as f:
+            permissions = json.load(f)
+    except:
+        permissions = {}
+
+    # Prod veritabanı adlarını al
+    prod_dbs = []
+    try:
+        conn = get_conn(PROD_SQL)
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sys.databases WHERE database_id > 4")
+        prod_dbs = [row[0] for row in cursor.fetchall()]
+        conn.close()
+    except:
+        pass
+
+    # Tüm dev veritabanlarını (isim + oluşturulma tarihi ile) al
     all_dev_dbs = []
     try:
         conn = get_conn(DEV_SQL)
@@ -221,7 +241,9 @@ def admin_panel():
         "admin.html",
         username=session['user'],
         allowed_users=allowed_users,
-        dev_dbs=all_dev_dbs
+        dev_dbs=all_dev_dbs,
+        permissions=permissions,
+        prod_dbs=prod_dbs  # ✅ Checkbox için gerekli
     )
 
 @app.route('/admin/add-user', methods=['POST'])
@@ -234,10 +256,10 @@ def admin_add_user():
     if new_user:
         try:
             # Aynı kullanıcı zaten varsa tekrar yazma
-            with open("allowed_users.txt", "r") as f:
+            with open(ALLOWED_USERS_PATH, "r") as f:
                 existing = [line.strip().lower() for line in f.readlines()]
             if new_user not in existing:
-                with open("allowed_users.txt", "a") as f:
+                with open(ALLOWED_USERS_PATH, "a") as f:
                     f.write(f"{new_user}\n")
         except Exception as e:
             return f"Kullanıcı eklenemedi: {e}", 500
@@ -254,11 +276,11 @@ def admin_delete_user():
         return redirect(url_for("admin_panel"))
 
     try:
-        with open("allowed_users.txt", "r") as f:
+        with open(ALLOWED_USERS_PATH, "r") as f:
             lines = [line.strip() for line in f.readlines()]
         lines = [u for u in lines if u.lower() != user_to_delete]
 
-        with open("allowed_users.txt", "w") as f:
+        with open(ALLOWED_USERS_PATH, "w") as f:
             for u in lines:
                 f.write(f"{u}\n")
     except Exception as e:
@@ -279,10 +301,45 @@ def admin_delete_db():
         cursor.execute("SELECT COUNT(1) FROM sys.databases WHERE name = ?", dev_db)
         exists = cursor.fetchone()[0]
         if exists:
-            cursor.execute(f"DROP DATABASE [{dev_db}]")
+            cursor.execute(f"""
+                ALTER DATABASE [{dev_db}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+                DROP DATABASE [{dev_db}];
+            """)
         conn.close()
     except Exception as e:
         return f"Veritabanı silinemedi: {e}", 500
+
+    return redirect(url_for("admin_panel"))
+
+@app.route('/admin/update-permissions', methods=['POST'])
+def update_permissions():
+    if not is_admin():
+        return "Erişiminiz yok", 403
+
+    # 🟡 Eski izinleri oku
+    try:
+        with open(PERMISSIONS_PATH) as f:
+            all_permissions = json.load(f)
+    except:
+        all_permissions = {}
+
+    # 🔄 Formdan gelen güncellemeleri al
+    updated = {}
+    for key in request.form:
+        if key.startswith("perm-"):
+            _, user, db = key.split("-", 2)
+            updated.setdefault(user, []).append(db)
+
+    # 🧩 Güncel bilgileri eski kayıtlarla birleştir
+    for user, dbs in updated.items():
+        all_permissions[user] = dbs  # sadece ilgili kullanıcı güncellenir, diğerleri korunur
+
+    # 💾 Kaydet
+    try:
+        with open(PERMISSIONS_PATH, "w") as f:
+            json.dump(all_permissions, f, indent=4)
+    except Exception as e:
+        return f"İzinler kaydedilemedi: {e}", 500
 
     return redirect(url_for("admin_panel"))
 
@@ -295,6 +352,13 @@ def create_dev_db():
     username = session['user']
     dev_db = f"{prod_db}_dev_{username}"
 
+    # Kullanıcı izin kontrolü
+    permissions = load_permissions()
+    allowed_dbs = permissions.get(username, [])
+    if prod_db not in allowed_dbs:
+        return "Bu işlemi yapma yetkiniz yok.", 403
+
+    # Zaten aktif ya da kuyruktaysa tekrar ekleme
     job = {"prod_db": prod_db, "dev_db": dev_db, "username": username}
     in_queue = any(j["dev_db"] == dev_db for j in job_queue)
     is_active = active_job and active_job["dev_db"] == dev_db
@@ -302,6 +366,13 @@ def create_dev_db():
         job_queue.append(job)
 
     return redirect(url_for('dashboard'))
+
+def load_permissions():
+    try:
+        with open(PERMISSIONS_PATH) as f:
+            return json.load(f)
+    except Exception:
+        return {}
 
 @app.route('/dashboard')
 def dashboard():
@@ -321,14 +392,14 @@ def dashboard():
     except:
         pass
 
-    # RAM'de aktif işler varsa onları da ekle
+    # RAM'deki aktif işleri de dahil et
     user_jobs = [db for db in active_jobs if db.endswith(f"_dev_{username}")]
     for job in user_jobs:
         if job not in dev_dbs:
             dev_dbs.append(job)
 
-    # Prod veritabanları
-    prod_dbs = []
+    # Tüm prod veritabanları
+    prod_dbs_all = []
     try:
         conn = get_conn(PROD_SQL)
         cursor = conn.cursor()
@@ -340,10 +411,15 @@ def dashboard():
             WHERE d.database_id > 4
             GROUP BY d.name
         """)
-        prod_dbs = [{"name": row.name, "size_mb": row.size_mb} for row in cursor.fetchall()]
+        prod_dbs_all = [{"name": row.name, "size_mb": row.size_mb} for row in cursor.fetchall()]
         conn.close()
     except:
         pass
+
+    # Kullanıcının yetkili olduğu prod veritabanları
+    permissions = load_permissions()
+    allowed = permissions.get(username, [])
+    prod_dbs = [db for db in prod_dbs_all if db["name"] in allowed]
 
     return render_template(
         "dashboard.html",
@@ -398,13 +474,16 @@ def delete_dev_db():
                 active_jobs.pop(dev_db, None)
                 return redirect(url_for('dashboard'))
 
-        # 3. Eğer veritabanı yoksa veya işlemde değilse → normal DROP
+        # 3. Bağlantıları sonlandırarak DROP
         conn = get_conn(DEV_SQL)
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(1) FROM sys.databases WHERE name = ?", dev_db)
         exists = cursor.fetchone()[0]
         if exists:
-            cursor.execute(f"DROP DATABASE [{dev_db}]")
+            cursor.execute(f"""
+                ALTER DATABASE [{dev_db}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+                DROP DATABASE [{dev_db}];
+            """)
         conn.close()
         return redirect(url_for('dashboard'))
 

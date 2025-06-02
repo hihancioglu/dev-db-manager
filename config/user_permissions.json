@@ -1,0 +1,65 @@
+{
+    "s.yildiz": [
+        "KartOkuyucu",
+        "waterworks",
+        "baylandb",
+        "BaylanUretim",
+        "BarkodTakip",
+        "baylan_bms_uretim",
+        "baylan_bms",
+        "CustomerDB"
+    ],
+    "e.camdal": [
+        "KartOkuyucu",
+        "waterworks",
+        "baylandb"
+    ],
+    "i.hancioglu": [
+        "KartOkuyucu",
+        "waterworks",
+        "baylandb",
+        "BaylanUretim",
+        "BarkodTakip",
+        "baylan_bms_uretim",
+        "baylan_bms",
+        "CustomerDB"
+    ],
+    "asd": [
+        "BarkodTakip"
+    ],
+    "a.gundogdu": [
+        "KartOkuyucu",
+        "waterworks",
+        "baylandb",
+        "BaylanUretim",
+        "BarkodTakip",
+        "baylan_bms_uretim",
+        "baylan_bms",
+        "CustomerDB"
+    ],
+    "e.cakir": [
+        "KartOkuyucu",
+        "waterworks",
+        "baylandb",
+        "BaylanUretim",
+        "BarkodTakip",
+        "baylan_bms_uretim",
+        "baylan_bms",
+        "CustomerDB"
+    ],
+    "b.ulusoy": [
+        "KartOkuyucu",
+        "waterworks",
+        "baylandb",
+        "BaylanUretim",
+        "BarkodTakip",
+        "baylan_bms_uretim",
+        "baylan_bms",
+        "CustomerDB"
+    ],
+    "o.cihangir": [
+        "baylan_bms_uretim",
+        "baylan_bms",
+        "CustomerDB"
+    ]
+}
