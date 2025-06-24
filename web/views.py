@@ -328,7 +328,8 @@ def admin_delete_db():
         conn.close()
 
         # 2. Backup işlemi varsa kaynak sunucuda KILL et
-        prod_db = dev_db.split('_')[1] if '_' in dev_db else dev_db
+        parts = dev_db.split('_')
+        prod_db = dev_db if len(parts) < 3 else "_".join(parts[1:-1])
         conn = get_conn(source_sql)
         cursor = conn.cursor()
         cursor.execute("""
