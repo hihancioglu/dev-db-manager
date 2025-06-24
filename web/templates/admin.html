@@ -10,70 +10,75 @@
 <div class="container my-5">
     <h3 class="mb-4">👤 Admin Paneli</h3>
 
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h4>Merhaba, {{ username }}</h4>
-    <div>
-        <a href="/dashboard" class="btn btn-outline-primary btn-sm">📊 Dashboard</a>
-        <a href="/logout" class="btn btn-outline-danger btn-sm ms-2">Çıkış</a>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4>Merhaba, {{ username }}</h4>
+        <div>
+            <a href="/dashboard" class="btn btn-outline-primary btn-sm">📊 Dashboard</a>
+            <a href="/logout" class="btn btn-outline-danger btn-sm ms-2">Çıkış</a>
+        </div>
     </div>
-</div>
+
     <!-- ✅ Kullanıcı Listesi -->
     <div class="card mb-4">
         <div class="card-header">✅ İzinli Kullanıcılar</div>
         <div class="card-body">
             <ul class="list-group mb-3">
-    {% for user in allowed_users %}
-    <li class="list-group-item d-flex justify-content-between align-items-center">
-        {{ user }}
-        <div class="d-flex gap-2 align-items-center">
-            <!-- 🛠 Yetkileri Düzenle Butonu + Hover Bilgi -->
-            <button class="btn btn-sm btn-primary"
-                    data-bs-toggle="modal"
-                    data-bs-target="#permModal-{{ user }}"
-                    title="Yetkili DB: {{ permissions.get(user) | join(', ') if permissions.get(user) else 'Yok' }}">
-                Yetkileri Düzenle
-            </button>
-
-            <!-- 🗑 Sil Butonu -->
-            <form method="post" action="/admin/delete-user" onsubmit="return confirm('Bu kullanıcı silinsin mi?')">
-                <input type="hidden" name="user_to_delete" value="{{ user }}">
-                <button type="submit" class="btn btn-danger btn-sm">Sil</button>
-            </form>
-        </div>
-    </li>
-
-    <!-- Modal: Yetki Düzenleme -->
-    <div class="modal fade" id="permModal-{{ user }}" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-scrollable">
-            <div class="modal-content">
-                <form method="post" action="/admin/update-permissions">
-                    <div class="modal-header">
-                        <h5 class="modal-title">{{ user }} için veritabanı izinleri</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                {% for user in allowed_users %}
+                {% set safe_user = user | replace('.', '_') | replace('@', '_') %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    {{ user }}
+                    <div class="d-flex gap-2 align-items-center">
+                        <button class="btn btn-sm btn-primary"
+                                data-bs-toggle="modal"
+                                data-bs-target="#permModal-{{ safe_user }}"
+                                title="Yetkili DB: {{ permissions.get(user) | join(', ') if permissions.get(user) else 'Yok' }}">
+                            Yetkileri Düzenle
+                        </button>
+                        <form method="post" action="/admin/delete-user" onsubmit="return confirm('Bu kullanıcı silinsin mi?')">
+                            <input type="hidden" name="user_to_delete" value="{{ user }}">
+                            <button type="submit" class="btn btn-danger btn-sm">Sil</button>
+                        </form>
                     </div>
-                    <div class="modal-body">
-                        <input type="hidden" name="user" value="{{ user }}">
-                        {% for db in prod_dbs %}
-                        <div class="form-check">
-                            <input class="form-check-input"
-                                   type="checkbox"
-                                   name="perm-{{ user }}-{{ db }}"
-                                   id="chk-{{ user }}-{{ db }}"
-                                   {% if permissions.get(user) and db in permissions.get(user) %}checked{% endif %}>
-                            <label class="form-check-label" for="chk-{{ user }}-{{ db }}">{{ db }}</label>
+                </li>
+
+                <!-- Modal: Yetki Düzenleme -->
+                <div class="modal fade" id="permModal-{{ safe_user }}" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-scrollable">
+                        <div class="modal-content">
+                            <form method="post" action="/admin/update-permissions">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">{{ user }} için veritabanı izinleri</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <input type="hidden" name="user" value="{{ user }}">
+                                    {% set user_perms = permissions.get(user, {}) %}
+                                    {% for server, dbs in prod_dbs_grouped.items() %}
+                                        <h6 class="mt-2">{{ server }} sunucusu</h6>
+                                        {% set db_list = user_perms.get(server, []) %}
+                                        {% for db in dbs %}
+                                        <div class="form-check">
+                                            <input class="form-check-input"
+                                                   type="checkbox"
+                                                   name="perm-{{ user }}-{{ server }}::{{ db }}"
+                                                   id="chk-{{ user }}-{{ server }}::{{ db }}"
+                                                   {% if db in db_list %}checked{% endif %}>
+                                            <label class="form-check-label" for="chk-{{ user }}-{{ server }}::{{ db }}">{{ db }}</label>
+                                        </div>
+                                        {% endfor %}
+                                    {% endfor %}
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="submit" class="btn btn-success">Kaydet</button>
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Kapat</button>
+                                </div>
+                            </form>
                         </div>
-                        {% endfor %}
                     </div>
-                    <div class="modal-footer">
-                        <button type="submit" class="btn btn-success">Kaydet</button>
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Kapat</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-    {% endfor %}
-</ul>
+                </div>
+                {% endfor %}
+            </ul>
+
             <form method="post" action="/admin/add-user" class="d-flex gap-2">
                 <input type="text" class="form-control" name="new_user" placeholder="Yeni kullanıcı (i.hancioglu)" required>
                 <button type="submit" class="btn btn-success">Ekle</button>

@@ -1,65 +1,137 @@
 {
-    "s.yildiz": [
-        "KartOkuyucu",
-        "waterworks",
-        "baylandb",
-        "BaylanUretim",
-        "BarkodTakip",
-        "baylan_bms_uretim",
-        "baylan_bms",
-        "CustomerDB"
+  "i.hancioglu": {
+    "main": [
+      "KartOkuyucu",
+      "waterworks",
+      "baylandb",
+      "BaylanUretim",
+      "BarkodTakip",
+      "baylan_bms_uretim",
+      "baylan_bms",
+      "CustomerDB",
+      "baylan_automationDB",
+      "baylan_bms_elektrik_uretim",
+      "baylan_bms_lisans"
     ],
-    "e.camdal": [
-        "KartOkuyucu",
-        "waterworks",
-        "baylandb"
-    ],
-    "i.hancioglu": [
-        "KartOkuyucu",
-        "waterworks",
-        "baylandb",
-        "BaylanUretim",
-        "BarkodTakip",
-        "baylan_bms_uretim",
-        "baylan_bms",
-        "CustomerDB"
-    ],
-    "asd": [
-        "BarkodTakip"
-    ],
-    "a.gundogdu": [
-        "KartOkuyucu",
-        "waterworks",
-        "baylandb",
-        "BaylanUretim",
-        "BarkodTakip",
-        "baylan_bms_uretim",
-        "baylan_bms",
-        "CustomerDB"
-    ],
-    "e.cakir": [
-        "KartOkuyucu",
-        "waterworks",
-        "baylandb",
-        "BaylanUretim",
-        "BarkodTakip",
-        "baylan_bms_uretim",
-        "baylan_bms",
-        "CustomerDB"
-    ],
-    "b.ulusoy": [
-        "KartOkuyucu",
-        "waterworks",
-        "baylandb",
-        "BaylanUretim",
-        "BarkodTakip",
-        "baylan_bms_uretim",
-        "baylan_bms",
-        "CustomerDB"
-    ],
-    "o.cihangir": [
-        "baylan_bms_uretim",
-        "baylan_bms",
-        "CustomerDB"
+    "mesafetest": [
+      "BMS",
+      "baylan_bms"
     ]
+  },
+  "e.camdal": {
+    "main": [
+      "baylan_bms_uretim",
+      "baylan_bms",
+      "CustomerDB",
+      "baylan_automationDB",
+      "baylan_bms_elektrik_uretim",
+      "baylan_bms_lisans"
+    ]
+  },
+  "s.yildiz": {
+    "main": [
+      "KartOkuyucu",
+      "waterworks",
+      "baylandb",
+      "BaylanUretim",
+      "BarkodTakip",
+      "baylan_bms_uretim",
+      "baylan_bms",
+      "CustomerDB",
+      "baylan_automationDB",
+      "baylan_bms_elektrik_uretim",
+      "baylan_bms_lisans"
+    ],
+    "mesafetest": [
+      "BMS",
+      "baylan_bms"
+    ]
+  },
+  "a.orhon": {
+    "main": [
+      "baylan_bms_uretim",
+      "baylan_bms",
+      "CustomerDB",
+      "baylan_bms_lisans"
+    ]
+  },
+  "b.ulusoy": {
+    "main": [
+      "baylan_bms_uretim",
+      "baylan_bms",
+      "CustomerDB",
+      "baylan_automationDB",
+      "baylan_bms_elektrik_uretim"
+    ],
+    "mesafetest": [
+      "BMS",
+      "baylan_bms"
+    ]
+  },
+  "e.cakir": {
+    "main": [
+      "baylan_bms_uretim",
+      "baylan_bms",
+      "CustomerDB"
+    ]
+  },
+  "o.cihangir": {
+    "main": [
+      "baylan_bms_uretim",
+      "baylan_bms",
+      "CustomerDB",
+      "baylan_bms_lisans"
+    ]
+  },
+  "o.yilmaz": {
+    "main": [
+      "baylan_bms_uretim",
+      "baylan_bms",
+      "CustomerDB",
+      "baylan_bms_elektrik_uretim"
+    ],
+    "mesafetest": [
+      "BMS",
+      "baylan_bms"
+    ]
+  },
+  "b.turgut": {
+    "main": [
+      "baylan_bms_uretim",
+      "baylan_bms",
+      "CustomerDB"
+    ]
+  },
+  "g.besiroglu": {
+    "main": [
+      "baylan_bms_uretim",
+      "baylan_bms",
+      "CustomerDB"
+    ],
+    "mesafetest": [
+      "BMS",
+      "baylan_bms"
+    ]
+  },
+  "u.gonul": {
+    "main": [
+      "baylan_bms_uretim",
+      "baylan_bms",
+      "CustomerDB"
+    ]
+  },
+  "z.yildiz": {
+    "main": [
+      "baylan_bms_uretim",
+      "baylan_bms",
+      "CustomerDB"
+    ]
+  },
+  "d.deri": {
+    "main": [
+      "baylan_automationDB",
+      "baylan_bms_elektrik_uretim",
+      "baylan_bms_lisans"
+    ]
+  }
 }

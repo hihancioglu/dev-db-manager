@@ -48,26 +48,29 @@
         <div class="card-body">
             <table class="table table-bordered table-sm">
                 <thead class="table-light">
-                    <tr>
-                        <th>Veritabanı</th>
-                        <th>Boyut (MB)</th>
-                        <th>İşlem</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for db in prod_dbs %}
-                    <tr>
-                        <td>{{ db.name }}</td>
-                        <td>{{ db.size_mb }}</td>
-                        <td>
-                            <form method="post" action="/create">
-                                <input type="hidden" name="prod_db" value="{{ db.name }}">
-                                <button type="submit" class="btn btn-sm btn-success">Kopyala</button>
-                            </form>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
+    <tr>
+        <th>Sunucu</th>
+        <th>Veritabanı</th>
+        <th>Boyut (MB)</th>
+        <th>İşlem</th>
+    </tr>
+</thead>
+<tbody>
+    {% for db in prod_dbs %}
+    <tr>
+        <td>{{ db.prefix }}</td>
+        <td>{{ db.name }}</td>
+        <td>{{ db.size_mb }}</td>
+        <td>
+            <form method="post" action="/create">
+               <input type="hidden" name="prod_db" value="{{ db.name }}">
+               <input type="hidden" name="prefix" value="{{ db.prefix }}">
+               <button type="submit" class="btn btn-sm btn-success">Kopyala</button>
+            </form>
+        </td>
+    </tr>
+    {% endfor %}
+</tbody>
             </table>
         </div>
     </div>

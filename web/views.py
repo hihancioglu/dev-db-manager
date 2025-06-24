@@ -6,7 +6,7 @@ from ldap3 import Server, Connection, ALL, NTLM
 import pyodbc
 import os
 import json
-from web.paths import ALLOWED_USERS_PATH, ADMIN_USERS_PATH, PERMISSIONS_PATH
+from web.paths import ALLOWED_USERS_PATH, ADMIN_USERS_PATH, PERMISSIONS_PATH, SQL_SERVERS_PATH
 
 app = Flask(__name__)
 app.secret_key = 'your-secret-key'
@@ -42,12 +42,20 @@ def get_conn(server_ip):
         autocommit=True
     )
 
-def run_backup_restore(prod_db, dev_db, username):
+def load_sql_servers():
+    try:
+        with open(SQL_SERVERS_PATH) as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"[ERROR] SQL sunucu listesi yüklenemedi: {e}")
+        return {}
+
+def run_backup_restore(prod_db, dev_db, username, source_sql):
     try:
         active_jobs[dev_db] = {"stage": "backup", "percent": 0}
 
         # 🔹 STEP 1: BACKUP
-        prod_conn = get_conn(PROD_SQL)
+        prod_conn = get_conn(source_sql)
         prod_cursor = prod_conn.cursor()
         bak_file = f"{BACKUP_SHARE_PATH}\\{prod_db}.bak"
         prod_cursor.execute(f"BACKUP DATABASE [{prod_db}] TO DISK = N'{bak_file}' WITH INIT")
@@ -123,7 +131,7 @@ def job_worker():
         if active_job is None and job_queue:
             job = job_queue.popleft()
             active_job = job
-            run_backup_restore(job['prod_db'], job['dev_db'], job['username'])
+            run_backup_restore(job['prod_db'], job['dev_db'], job['username'], job['source_sql'])
             active_job = None
         else:
             time.sleep(1)
@@ -210,16 +218,19 @@ def admin_panel():
     except:
         permissions = {}
 
-    # Prod veritabanı adlarını al
-    prod_dbs = []
-    try:
-        conn = get_conn(PROD_SQL)
-        cursor = conn.cursor()
-        cursor.execute("SELECT name FROM sys.databases WHERE database_id > 4")
-        prod_dbs = [row[0] for row in cursor.fetchall()]
-        conn.close()
-    except:
-        pass
+    # Tüm SQL sunucularından veritabanı isimlerini grupla
+    prod_dbs_grouped = {}
+    sql_servers = load_sql_servers()
+
+    for server_name, ip in sql_servers.items():
+        try:
+            conn = get_conn(ip)
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM sys.databases WHERE database_id > 4")
+            prod_dbs_grouped[server_name] = [row[0] for row in cursor.fetchall()]
+            conn.close()
+        except:
+            prod_dbs_grouped[server_name] = []
 
     # Tüm dev veritabanlarını (isim + oluşturulma tarihi ile) al
     all_dev_dbs = []
@@ -229,7 +240,7 @@ def admin_panel():
         cursor.execute("""
             SELECT name, create_date
             FROM sys.databases
-            WHERE name LIKE '%_dev_%'
+            WHERE name NOT IN ('master','tempdb','model','msdb')
         """)
         rows = cursor.fetchall()
         all_dev_dbs = [{"name": row.name, "created": row.create_date.strftime("%Y-%m-%d %H:%M")} for row in rows]
@@ -243,7 +254,7 @@ def admin_panel():
         allowed_users=allowed_users,
         dev_dbs=all_dev_dbs,
         permissions=permissions,
-        prod_dbs=prod_dbs  # ✅ Checkbox için gerekli
+        prod_dbs_grouped=prod_dbs_grouped
     )
 
 @app.route('/admin/add-user', methods=['POST'])
@@ -294,8 +305,42 @@ def admin_delete_db():
         return "Erişiminiz yok", 403
 
     dev_db = request.form.get("dev_db")
+    if not dev_db:
+        return redirect(url_for("admin_panel"))
 
     try:
+        # Aktif işlemlerden source_sql al
+        source_sql = PROD_SQL
+        if active_job and active_job['dev_db'] == dev_db:
+            source_sql = active_job.get('source_sql', PROD_SQL)
+
+        # 1. Restore işlemi varsa dev sunucuda KILL et
+        conn = get_conn(DEV_SQL)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT session_id FROM sys.dm_exec_requests
+            WHERE command = 'RESTORE DATABASE' AND DB_NAME(database_id) = ?
+        """, dev_db)
+        row = cursor.fetchone()
+        if row:
+            cursor.execute(f"KILL {row.session_id}")
+            active_jobs.pop(dev_db, None)
+        conn.close()
+
+        # 2. Backup işlemi varsa kaynak sunucuda KILL et
+        prod_db = dev_db.split('_')[1] if '_' in dev_db else dev_db
+        conn = get_conn(source_sql)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT session_id FROM sys.dm_exec_requests
+            WHERE command = 'BACKUP DATABASE' AND DB_NAME(database_id) = ?
+        """, prod_db)
+        row = cursor.fetchone()
+        if row:
+            cursor.execute(f"KILL {row.session_id}")
+        conn.close()
+
+        # 3. Veritabanını zorla sil
         conn = get_conn(DEV_SQL)
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(1) FROM sys.databases WHERE name = ?", dev_db)
@@ -306,6 +351,7 @@ def admin_delete_db():
                 DROP DATABASE [{dev_db}];
             """)
         conn.close()
+
     except Exception as e:
         return f"Veritabanı silinemedi: {e}", 500
 
@@ -316,30 +362,27 @@ def update_permissions():
     if not is_admin():
         return "Erişiminiz yok", 403
 
-    # 🟡 Eski izinleri oku
-    try:
-        with open(PERMISSIONS_PATH) as f:
-            all_permissions = json.load(f)
-    except:
-        all_permissions = {}
+    permissions = load_permissions()
+    user = request.form.get("user")
 
-    # 🔄 Formdan gelen güncellemeleri al
-    updated = {}
+    if not user:
+        return "Geçersiz kullanıcı", 400
+
+    # Kullanıcıya ait yeni sunucu → veritabanı listesi oluştur
+    new_user_perms = {}
+
     for key in request.form:
-        if key.startswith("perm-"):
-            _, user, db = key.split("-", 2)
-            updated.setdefault(user, []).append(db)
+        if key.startswith(f"perm-{user}-"):
+            _, _, full = key.split("-", 2)
+            if "::" in full:
+                server, db = full.split("::", 1)
+                if server not in new_user_perms:
+                    new_user_perms[server] = []
+                new_user_perms[server].append(db)
 
-    # 🧩 Güncel bilgileri eski kayıtlarla birleştir
-    for user, dbs in updated.items():
-        all_permissions[user] = dbs  # sadece ilgili kullanıcı güncellenir, diğerleri korunur
-
-    # 💾 Kaydet
-    try:
-        with open(PERMISSIONS_PATH, "w") as f:
-            json.dump(all_permissions, f, indent=4)
-    except Exception as e:
-        return f"İzinler kaydedilemedi: {e}", 500
+    # permissions.json içine güncel olarak kaydet
+    permissions[user] = new_user_perms
+    save_permissions(permissions)
 
     return redirect(url_for("admin_panel"))
 
@@ -348,18 +391,37 @@ def create_dev_db():
     if 'user' not in session:
         return redirect(url_for('login'))
 
-    prod_db = request.form['prod_db']
+    prefix = request.form.get('prefix')  # Örnek: "main"
+    prod_db = request.form.get('prod_db')  # Örnek: "baylan_bms"
     username = session['user']
-    dev_db = f"{prod_db}_dev_{username}"
+    dev_db = f"{prefix}_{prod_db}_{username}"
 
-    # Kullanıcı izin kontrolü
+    # 🔍 DEBUG
+    print(f"[DEBUG] Kullanıcı: {username}")
+    print(f"[DEBUG] Gelen prefix: {prefix}")
+    print(f"[DEBUG] Gelen prod_db: {prod_db}")
+    print(f"[DEBUG] Oluşturulacak dev_db: {dev_db}")
+
+    # SQL sunucu IP'lerini al
+    servers = load_sql_servers()
+    if prefix not in servers:
+        print(f"[ERROR] Tanımsız prefix: {prefix}")
+        return f"Tanımsız sunucu prefix: {prefix}", 400
+
+    source_sql = servers[prefix]
+
+    # Kullanıcı izin kontrolü (yeni yapı)
     permissions = load_permissions()
-    allowed_dbs = permissions.get(username, [])
-    if prod_db not in allowed_dbs:
+    allowed = permissions.get(username, {}).get(prefix, [])
+
+    print(f"[DEBUG] Kullanıcının izinli olduğu DB'ler ({prefix}): {allowed}")
+
+    if prod_db not in allowed:
+        print(f"[ERROR] {username} kullanıcısının {prefix} üzerinde {prod_db} yetkisi yok!")
         return "Bu işlemi yapma yetkiniz yok.", 403
 
-    # Zaten aktif ya da kuyruktaysa tekrar ekleme
-    job = {"prod_db": prod_db, "dev_db": dev_db, "username": username}
+    # Aynı dev veritabanı zaten işleniyor mu kontrol et
+    job = {"prod_db": prod_db, "dev_db": dev_db, "username": username, "source_sql": source_sql}
     in_queue = any(j["dev_db"] == dev_db for j in job_queue)
     is_active = active_job and active_job["dev_db"] == dev_db
     if not in_queue and not is_active:
@@ -374,6 +436,13 @@ def load_permissions():
     except Exception:
         return {}
 
+def save_permissions(permissions):
+    try:
+        with open(PERMISSIONS_PATH, "w") as f:
+            json.dump(permissions, f, indent=2)
+    except Exception as e:
+        print(f"[ERROR] save_permissions: {e}")
+
 @app.route('/dashboard')
 def dashboard():
     if 'user' not in session:
@@ -381,45 +450,58 @@ def dashboard():
 
     username = session['user']
 
-    # Dev veritabanları
+    # Dev SQL'deki kullanıcıya ait veritabanlarını al
     dev_dbs = []
     try:
         conn = get_conn(DEV_SQL)
         cursor = conn.cursor()
-        cursor.execute("SELECT name FROM sys.databases WHERE name LIKE ?", f"%_dev_{username}")
+        cursor.execute("SELECT name FROM sys.databases WHERE name LIKE ?", f"%_{username}")
         dev_dbs = [row[0] for row in cursor.fetchall()]
         conn.close()
     except:
         pass
 
     # RAM'deki aktif işleri de dahil et
-    user_jobs = [db for db in active_jobs if db.endswith(f"_dev_{username}")]
+    user_jobs = [db for db in active_jobs if db.endswith(f"_{username}")]
     for job in user_jobs:
         if job not in dev_dbs:
             dev_dbs.append(job)
 
-    # Tüm prod veritabanları
-    prod_dbs_all = []
-    try:
-        conn = get_conn(PROD_SQL)
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT d.name,
-                   CAST(SUM(mf.size) * 8 / 1024 AS INT) AS size_mb
-            FROM sys.databases d
-            JOIN sys.master_files mf ON d.database_id = mf.database_id
-            WHERE d.database_id > 4
-            GROUP BY d.name
-        """)
-        prod_dbs_all = [{"name": row.name, "size_mb": row.size_mb} for row in cursor.fetchall()]
-        conn.close()
-    except:
-        pass
+    # SQL sunucularını yükle
+    sql_servers = load_sql_servers()
 
-    # Kullanıcının yetkili olduğu prod veritabanları
+    # Kullanıcının yetkili olduğu veritabanları (yeni format)
     permissions = load_permissions()
-    allowed = permissions.get(username, [])
-    prod_dbs = [db for db in prod_dbs_all if db["name"] in allowed]
+    user_perms = permissions.get(username, {})
+    print(f"[DEBUG] user_perms: {user_perms}")
+
+    prod_dbs = []
+
+    for prefix, ip in sql_servers.items():
+        print(f"[DEBUG] checking {prefix} on {ip}")
+        try:
+            conn = get_conn(ip)
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT d.name,
+                       CAST(SUM(mf.size) * 8 / 1024 AS INT) AS size_mb
+                FROM sys.databases d
+                JOIN sys.master_files mf ON d.database_id = mf.database_id
+                WHERE d.database_id > 4
+                GROUP BY d.name
+            """)
+            rows = cursor.fetchall()
+            for row in rows:
+                print(f"[DEBUG] {prefix} - {row.name}")
+                if row.name in user_perms.get(prefix, []):
+                    prod_dbs.append({
+                        "prefix": prefix,
+                        "name": row.name,
+                        "size_mb": row.size_mb
+                    })
+            conn.close()
+        except Exception as e:
+            print(f"[ERROR] {prefix} SQL sunucusundan veritabanları alınamadı → {e}")
 
     return render_template(
         "dashboard.html",
@@ -439,12 +521,17 @@ def delete_dev_db():
     dev_db = request.form['dev_db']
     username = session['user']
 
-    # Kendi veritabanı mı?
-    if not dev_db.endswith(f"_dev_{username}"):
+    # Dev DB kullanıcı kontrolü (yeni format: prod_dbname_i.hancioglu)
+    if not dev_db.endswith(f"_{username}"):
         return "Bu işlemi yapamazsınız.", 403
 
     try:
-        # 1. Eğer bu veritabanı aktif işlemdeyse (restore)
+        # Aktif işlemlerden source_sql bilgisi alınması gerekir
+        source_sql = PROD_SQL  # default olarak PROD
+        if active_job and active_job['dev_db'] == dev_db:
+            source_sql = active_job.get('source_sql', PROD_SQL)
+
+        # 1. Eğer bu veritabanı restore işlemindeyse
         if active_job and active_job['dev_db'] == dev_db:
             conn = get_conn(DEV_SQL)
             cursor = conn.cursor()
@@ -459,14 +546,15 @@ def delete_dev_db():
                 active_jobs.pop(dev_db, None)
                 return redirect(url_for('dashboard'))
 
-        # 2. Eğer bu veritabanı aktif işlemdeyse (backup)
-        if active_job and active_job['prod_db'] == dev_db.split("_dev_")[0]:
-            conn = get_conn(PROD_SQL)
+        # 2. Eğer bu veritabanı backup işlemindeyse
+        if active_job and active_job.get('prod_db') and active_job['dev_db'] == dev_db:
+            prod_db = active_job['prod_db']
+            conn = get_conn(source_sql)
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT session_id FROM sys.dm_exec_requests
                 WHERE command = 'BACKUP DATABASE' AND DB_NAME(database_id) = ?
-            """, dev_db.split("_dev_")[0])
+            """, prod_db)
             row = cursor.fetchone()
             if row:
                 cursor.execute(f"KILL {row.session_id}")
@@ -474,7 +562,7 @@ def delete_dev_db():
                 active_jobs.pop(dev_db, None)
                 return redirect(url_for('dashboard'))
 
-        # 3. Bağlantıları sonlandırarak DROP
+        # 3. Bağlantıları kopararak zorla DROP
         conn = get_conn(DEV_SQL)
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(1) FROM sys.databases WHERE name = ?", dev_db)
@@ -493,36 +581,58 @@ def delete_dev_db():
 @app.route('/progress')
 def progress():
     dev_db = request.args.get('dev_db')
-    prod_db = dev_db.split("_dev_")[0] if "_dev_" in dev_db else dev_db
 
-    # 1. Prod sunucuda backup kontrolü
+    if not dev_db:
+        return jsonify({
+            "dev_db": "unknown",
+            "stage": "error",
+            "percent_complete": 0,
+            "status": "invalid_request"
+        })
+
+    # prod_db adı: mesela mesafetest_BMS_i.hancioglu → BMS
+    parts = dev_db.split("_")
+    if len(parts) < 3:
+        prod_db = dev_db
+    else:
+        prod_db = "_".join(parts[1:-1])
+
+    # Kaynağın hangi SQL sunucusu olduğunu bul
+    source_sql = active_jobs.get(dev_db, {}).get("source_sql", PROD_SQL)
+
+    # 1. Prod sunucuda backup kontrolü (sql_text eşleşmesi zorunlu)
     try:
-        conn = get_conn(PROD_SQL)
+        conn = get_conn(source_sql)
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT percent_complete, command
-            FROM sys.dm_exec_requests
-            WHERE command = 'BACKUP DATABASE'
-              AND (DB_NAME(database_id) = ? OR database_id IS NULL)
-        """, prod_db)
-        row = cursor.fetchone()
+            SELECT r.percent_complete, r.command, st.text AS sql_text
+            FROM sys.dm_exec_requests r
+            CROSS APPLY sys.dm_exec_sql_text(r.sql_handle) AS st
+            WHERE r.command = 'BACKUP DATABASE'
+        """)
+        rows = cursor.fetchall()
         conn.close()
-        if row:
-            return jsonify({
-                "dev_db": dev_db,
-                "stage": "backup",
-                "percent_complete": int(row.percent_complete),
-                "status": "running"
-            })
-    except:
-        pass
 
-    # 2. Dev sunucuda restore kontrolü (sql_text ile eşleşme yapılır)
+        for row in rows:
+            sql_text = row.sql_text or ''
+            # BMS, [BMS], "BMS", N'BMS' gibi farklı formatlar olabilir
+            normalized = sql_text.replace("[", "").replace("]", "").replace('"', "").replace("'", "").upper()
+            if f"BACKUP DATABASE {prod_db.upper()}" in normalized:
+                return jsonify({
+                    "dev_db": dev_db,
+                    "stage": "backup",
+                    "percent_complete": int(row.percent_complete),
+                    "status": "running"
+                })
+    except Exception as e:
+        print(f"[BACKUP CHECK ERROR] {e}")
+
+    # 2. Dev sunucuda restore kontrolü
     try:
         conn = get_conn(DEV_SQL)
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT r.percent_complete, r.command, DB_NAME(r.database_id) AS dbname, st.text AS sql_text
+            SELECT r.percent_complete, r.command, st.text AS sql_text
             FROM sys.dm_exec_requests r
             CROSS APPLY sys.dm_exec_sql_text(r.sql_handle) AS st
             WHERE r.command = 'RESTORE DATABASE'
@@ -539,9 +649,9 @@ def progress():
                     "status": "running"
                 })
     except Exception as e:
-        print(f"[RESTORE ERROR] {e}")
+        print(f"[RESTORE CHECK ERROR] {e}")
 
-    # Hiçbir işlem bulunamadıysa completed kabul et
+    # İşlem görünmüyorsa tamamlandı kabul et
     return jsonify({
         "dev_db": dev_db,
         "stage": "completed",
