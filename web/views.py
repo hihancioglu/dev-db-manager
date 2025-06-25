@@ -7,6 +7,10 @@ import pyodbc
 import os
 import json
 import re
+
+# Maximum number of rows returned from a SELECT query in the UI.
+# Prevents memory issues with extremely large result sets.
+MAX_ROWS = 10000
 from web.paths import (
     ALLOWED_USERS_PATH,
     ADMIN_USERS_PATH,
@@ -740,9 +744,14 @@ def query_page():
                             columns = []
                             message = "Query executed successfully."
                         else:
-                            rows = cursor.fetchall()
+                            # Fetch up to MAX_ROWS + 1 rows to detect truncation
+                            rows = cursor.fetchmany(MAX_ROWS + 1)
+                            truncated = len(rows) > MAX_ROWS
+                            rows = rows[:MAX_ROWS]
                             columns = [col[0] for col in cursor.description]
                             result = [list(row) for row in rows]
+                            if truncated:
+                                message = f"Showing first {MAX_ROWS} rows."
                         log_query(username, f"{prefix}/{database}", query_text)
                     except Exception as e:
                         error = f"Sorgu hatası: {e}"
