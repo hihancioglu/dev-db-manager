@@ -27,6 +27,13 @@ active_job = None
 job_queue = deque()
 active_jobs = {}
 
+def extract_prod_db(dev_db: str) -> str:
+    """Return production database name from a dev database name."""
+    parts = dev_db.split("_")
+    if len(parts) < 3:
+        return dev_db
+    return "_".join(parts[1:-1])
+
 def is_admin():
     try:
         with open(ADMIN_USERS_PATH) as f:
@@ -328,7 +335,7 @@ def admin_delete_db():
         conn.close()
 
         # 2. Backup işlemi varsa kaynak sunucuda KILL et
-        prod_db = dev_db.split('_')[1] if '_' in dev_db else dev_db
+        prod_db = extract_prod_db(dev_db)
         conn = get_conn(source_sql)
         cursor = conn.cursor()
         cursor.execute("""
@@ -591,11 +598,7 @@ def progress():
         })
 
     # prod_db adı: mesela mesafetest_BMS_i.hancioglu → BMS
-    parts = dev_db.split("_")
-    if len(parts) < 3:
-        prod_db = dev_db
-    else:
-        prod_db = "_".join(parts[1:-1])
+    prod_db = extract_prod_db(dev_db)
 
     # Kaynağın hangi SQL sunucusu olduğunu bul
     source_sql = active_jobs.get(dev_db, {}).get("source_sql", PROD_SQL)
