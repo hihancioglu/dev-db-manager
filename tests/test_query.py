@@ -69,3 +69,85 @@ def test_selected_db_in_response(monkeypatch):
     resp = client.post('/query', data={'database': 'main::DB1', 'query': 'SELECT 1'}, follow_redirects=True)
     html = resp.data.decode('utf-8')
     assert '<option value="main::DB1" selected>' in html
+
+
+def test_update_shows_confirmation(monkeypatch):
+    monkeypatch.setattr('web.views.load_permissions', lambda: {'tester': {'main': ['DB1']}})
+    monkeypatch.setattr('web.views.load_sql_servers', lambda: {'main': '10.0.0.1'})
+
+    class FakeCursor:
+        description = None
+
+        def __init__(self):
+            self.affected = 3
+
+        def execute(self, sql, *args, **kwargs):
+            pass
+
+        def fetchone(self):
+            return (self.affected,)
+
+        def fetchmany(self, *args, **kwargs):
+            return []
+
+    class FakeConn:
+        def cursor(self):
+            return FakeCursor()
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr('web.views.get_conn', lambda ip: FakeConn())
+
+    client = app.test_client()
+    with client.session_transaction() as sess:
+        sess['user'] = 'tester'
+
+    resp = client.post('/query', data={'database': 'main::DB1', 'query': 'UPDATE t SET a=1'}, follow_redirects=True)
+    assert b'id="confirmModal"' in resp.data
+    with client.session_transaction() as sess:
+        assert sess['pending_query'] == 'UPDATE t SET a=1'
+        assert sess['pending_db'] == 'main::DB1'
+        assert sess['affected'] == 3
+
+
+def test_execute_query_uses_session(monkeypatch):
+    monkeypatch.setattr('web.views.load_permissions', lambda: {'tester': {'main': ['DB1']}})
+    monkeypatch.setattr('web.views.load_sql_servers', lambda: {'main': '10.0.0.1'})
+
+    executed = []
+
+    class FakeCursor:
+        description = None
+
+        def execute(self, sql, *args, **kwargs):
+            executed.append(sql)
+
+        def fetchone(self):
+            return (5,)
+
+        def fetchmany(self, *args, **kwargs):
+            return []
+
+    class FakeConn:
+        def cursor(self):
+            return FakeCursor()
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr('web.views.get_conn', lambda ip: FakeConn())
+
+    client = app.test_client()
+    with client.session_transaction() as sess:
+        sess['user'] = 'tester'
+        sess['pending_query'] = 'UPDATE t SET a=1'
+        sess['pending_db'] = 'main::DB1'
+        sess['affected'] = 5
+
+    resp = client.post('/execute-query', follow_redirects=True)
+    html = resp.data.decode('utf-8')
+    assert '<option value="main::DB1" selected>' in html
+    assert 'UPDATE t SET a=1' in executed
+    with client.session_transaction() as sess:
+        assert 'pending_query' not in sess
