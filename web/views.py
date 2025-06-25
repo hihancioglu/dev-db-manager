@@ -683,6 +683,7 @@ def cancel_queued():
 
 def log_query(username, database, query_text):
     ts = time.strftime('%Y-%m-%d %H:%M:%S')
+
     safe_query = re.sub(r'[\r\n]+', ' ', query_text).strip()
     line = f"{ts} | {username} | {database} | {safe_query}\n"
     try:
