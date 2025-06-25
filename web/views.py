@@ -745,6 +745,14 @@ def query_page():
     error = None
     message = None
     selected_db = ""
+    show_confirm = False
+    pending_query = None
+    affected_rows = None
+
+    if request.method == 'GET':
+        session.pop('pending_query', None)
+        session.pop('pending_db', None)
+        session.pop('affected', None)
 
     if request.method == 'POST':
         selected_db = request.form.get('database')
@@ -775,21 +783,33 @@ def query_page():
                             conn = get_conn(ip)
                             cursor = conn.cursor()
                             cursor.execute(f"USE [{database}]")
-                            cursor.execute(query_text)
-                            if cursor.description is None:
-                                result = []
-                                columns = []
-                                message = "Query executed successfully."
+                            if re.match(r"^(DELETE|UPDATE)\\b", query_text, re.IGNORECASE):
+                                cursor.execute("BEGIN TRANSACTION")
+                                cursor.execute(query_text)
+                                cursor.execute("SELECT @@ROWCOUNT AS affected")
+                                affected_rows = cursor.fetchone()[0]
+                                cursor.execute("ROLLBACK")
+                                conn.close()
+                                session['pending_query'] = query_text
+                                session['pending_db'] = selected
+                                session['affected'] = affected_rows
+                                pending_query = query_text
+                                show_confirm = True
                             else:
-                                # Fetch up to MAX_ROWS + 1 rows to detect truncation
-                                rows = cursor.fetchmany(MAX_ROWS + 1)
-                                truncated = len(rows) > MAX_ROWS
-                                rows = rows[:MAX_ROWS]
-                                columns = [col[0] for col in cursor.description]
-                                result = [list(row) for row in rows]
-                                if truncated:
-                                    message = f"Showing first {MAX_ROWS} rows."
-                            log_query(username, f"{prefix}/{database}", query_text)
+                                cursor.execute(query_text)
+                                if cursor.description is None:
+                                    result = []
+                                    columns = []
+                                    message = "Query executed successfully."
+                                else:
+                                    rows = cursor.fetchmany(MAX_ROWS + 1)
+                                    truncated = len(rows) > MAX_ROWS
+                                    rows = rows[:MAX_ROWS]
+                                    columns = [col[0] for col in cursor.description]
+                                    result = [list(row) for row in rows]
+                                    if truncated:
+                                        message = f"Showing first {MAX_ROWS} rows."
+                                log_query(username, f"{prefix}/{database}", query_text)
                         except Exception as e:
                             error = f"Sorgu hatası: {e}"
                         finally:
@@ -807,4 +827,83 @@ def query_page():
         error=error,
         message=message,
         selected_db=selected_db,
+        show_confirm=show_confirm,
+        pending_query=pending_query,
+        affected=affected_rows,
+    )
+
+
+@app.route('/execute-query', methods=['POST'])
+def execute_query():
+    if 'user' not in session:
+        return redirect(url_for('login'))
+
+    username = session['user']
+    query_text = session.pop('pending_query', None)
+    selected = session.pop('pending_db', None)
+    session.pop('affected', None)
+
+    if not query_text or not selected:
+        return redirect(url_for('query_page'))
+
+    permissions = load_permissions()
+    sql_servers = load_sql_servers()
+
+    prod_dbs = []
+    for prefix, dbs in permissions.get(username, {}).items():
+        for db in dbs:
+            prod_dbs.append({'prefix': prefix, 'db': db})
+
+    prefix, database = selected.split('::', 1)
+    allowed = any(item['prefix'] == prefix and item['db'] == database for item in prod_dbs)
+
+    result = None
+    columns = []
+    error = None
+    message = None
+
+    if not allowed:
+        error = "Bu veritabanı için izniniz yok."
+    else:
+        ip = sql_servers.get(prefix)
+        if not ip:
+            error = "Sunucu bulunamadı."
+        else:
+            other_db = _detect_external_db(query_text, database)
+            if other_db:
+                error = (
+                    f"Sorgu içerisinde farklı bir veritabanı ('{other_db}') referansı tespit edildi."
+                )
+            else:
+                try:
+                    conn = get_conn(ip)
+                    cursor = conn.cursor()
+                    cursor.execute(f"USE [{database}]")
+                    cursor.execute(query_text)
+                    cursor.execute("SELECT @@ROWCOUNT AS affected")
+                    affected = cursor.fetchone()[0]
+                    result = []
+                    columns = []
+                    message = f"Query executed successfully. {affected} rows affected."
+                    log_query(username, f"{prefix}/{database}", query_text)
+                except Exception as e:
+                    error = f"Sorgu hatası: {e}"
+                finally:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
+
+    return render_template(
+        'query.html',
+        username=username,
+        prod_dbs=prod_dbs,
+        result=result,
+        columns=columns,
+        error=error,
+        message=message,
+        selected_db=selected,
+        show_confirm=False,
+        pending_query=None,
+        affected=None,
     )
