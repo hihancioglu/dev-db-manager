@@ -19,6 +19,27 @@ from web.paths import (
     QUERY_LOG_PATH,
 )
 
+def _detect_external_db(query, target_db):
+    """Return referenced DB name if query points to another database."""
+    use_match = re.search(r"\bUSE\s+(?:\[(?P<br>[^\]]+)\]|(?P<plain>\w+))", query, re.IGNORECASE)
+    if use_match:
+        db = use_match.group('br') or use_match.group('plain')
+        if db.lower() != target_db.lower():
+            return db
+
+    patterns = [
+        re.compile(r"(?:\[(?P<br>[^\]]+)\]|(?P<plain>\w+))\s*\.\s*(?:\w+\s*\.)\s*\w+", re.IGNORECASE),
+        re.compile(r"(?:\[(?P<br>[^\]]+)\]|(?P<plain>\w+))\s*\.\.\s*(?:\[[^\]]+\]|\w+)", re.IGNORECASE),
+    ]
+
+    for pat in patterns:
+        for m in pat.finditer(query):
+            db = m.group('br') or m.group('plain')
+            if db.lower() != target_db.lower():
+                return db
+
+    return None
+
 app = Flask(__name__)
 app.secret_key = 'your-secret-key'
 
@@ -734,6 +755,12 @@ def query_page():
                 if not ip:
                     error = "Sunucu bulunamadı."
                 else:
+                    other_db = _detect_external_db(query_text, database)
+                    if other_db:
+                        error = (
+                            f"Sorgu içerisinde farklı bir veritabanı ('{other_db}') referansı tespit edildi."
+                        )
+                    else:
                     try:
                         conn = get_conn(ip)
                         cursor = conn.cursor()
