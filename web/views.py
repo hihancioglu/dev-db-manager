@@ -710,6 +710,7 @@ def query_page():
     result = None
     columns = []
     error = None
+    message = None
 
     if request.method == 'POST':
         selected = request.form.get('database')  # format: prefix::db
@@ -734,13 +735,22 @@ def query_page():
                         cursor = conn.cursor()
                         cursor.execute(f"USE [{database}]")
                         cursor.execute(query_text)
-                        rows = cursor.fetchall()
-                        columns = [col[0] for col in cursor.description]
-                        result = [list(row) for row in rows]
-                        conn.close()
+                        if cursor.description is None:
+                            result = []
+                            columns = []
+                            message = "Query executed successfully."
+                        else:
+                            rows = cursor.fetchall()
+                            columns = [col[0] for col in cursor.description]
+                            result = [list(row) for row in rows]
                         log_query(username, f"{prefix}/{database}", query_text)
                     except Exception as e:
                         error = f"Sorgu hatası: {e}"
+                    finally:
+                        try:
+                            conn.close()
+                        except Exception:
+                            pass
 
     return render_template(
         'query.html',
@@ -749,4 +759,5 @@ def query_page():
         result=result,
         columns=columns,
         error=error,
+        message=message,
     )
