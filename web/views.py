@@ -28,8 +28,16 @@ def _detect_external_db(query, target_db):
             return db
 
     patterns = [
-        re.compile(r"(?:\[(?P<br>[^\]]+)\]|(?P<plain>\w+))\s*\.\s*(?:\w+\s*\.)\s*\w+", re.IGNORECASE),
-        re.compile(r"(?:\[(?P<br>[^\]]+)\]|(?P<plain>\w+))\s*\.\.\s*(?:\[[^\]]+\]|\w+)", re.IGNORECASE),
+        # three-part name: [DB].[schema].[table] or DB.schema.table (schema/table optional brackets)
+        re.compile(
+            r"(?:\[(?P<br>[^\]]+)\]|(?P<plain>\w+))\s*\.\s*(?:\[(?:[^\]]+)\]|\w+)\s*\.\s*(?:\[(?:[^\]]+)\]|\w+)",
+            re.IGNORECASE,
+        ),
+        # two-part name using .. syntax: DB..table
+        re.compile(
+            r"(?:\[(?P<br>[^\]]+)\]|(?P<plain>\w+))\s*\.\.\s*(?:\[[^\]]+\]|\w+)",
+            re.IGNORECASE,
+        ),
     ]
 
     for pat in patterns:
