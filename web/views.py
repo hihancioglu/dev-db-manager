@@ -744,9 +744,11 @@ def query_page():
     columns = []
     error = None
     message = None
+    selected_db = ""
 
     if request.method == 'POST':
-        selected = request.form.get('database')  # format: prefix::db
+        selected_db = request.form.get('database')
+        selected = selected_db  # format: prefix::db
         query_text = request.form.get('query', '').strip()
 
         if not selected or '::' not in selected:
@@ -804,4 +806,5 @@ def query_page():
         columns=columns,
         error=error,
         message=message,
+        selected_db=selected_db,
     )

@@ -32,3 +32,40 @@ def test_query_rejects_other_db(monkeypatch):
 
     resp = client.post('/query', data={'database': 'main::DB1', 'query': 'SELECT * FROM OtherDB.dbo.tbl'}, follow_redirects=True)
     assert b'farkli bir veritaban' in resp.data.lower()
+
+
+def test_selected_db_in_response(monkeypatch):
+    monkeypatch.setattr('web.views.load_permissions', lambda: {'tester': {'main': ['DB1']}})
+    monkeypatch.setattr('web.views.load_sql_servers', lambda: {'main': '10.0.0.1'})
+
+    def fake_get_conn(ip):
+        class FakeCursor:
+            description = None
+
+            def execute(self, *args, **kwargs):
+                pass
+
+            def fetchmany(self, *args, **kwargs):
+                return []
+
+            def close(self):
+                pass
+
+        class FakeConn:
+            def cursor(self):
+                return FakeCursor()
+
+            def close(self):
+                pass
+
+        return FakeConn()
+
+    monkeypatch.setattr('web.views.get_conn', fake_get_conn)
+
+    client = app.test_client()
+    with client.session_transaction() as sess:
+        sess['user'] = 'tester'
+
+    resp = client.post('/query', data={'database': 'main::DB1', 'query': 'SELECT 1'}, follow_redirects=True)
+    html = resp.data.decode('utf-8')
+    assert '<option value="main::DB1" selected>' in html
