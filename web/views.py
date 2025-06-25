@@ -6,7 +6,14 @@ from ldap3 import Server, Connection, ALL, NTLM
 import pyodbc
 import os
 import json
-from web.paths import ALLOWED_USERS_PATH, ADMIN_USERS_PATH, PERMISSIONS_PATH, SQL_SERVERS_PATH
+import re
+from web.paths import (
+    ALLOWED_USERS_PATH,
+    ADMIN_USERS_PATH,
+    PERMISSIONS_PATH,
+    SQL_SERVERS_PATH,
+    QUERY_LOG_PATH,
+)
 
 app = Flask(__name__)
 app.secret_key = 'your-secret-key'
@@ -672,3 +679,73 @@ def cancel_queued():
             job_queue.remove(job)
             break
     return redirect(url_for('dashboard'))
+
+
+def log_query(username, database, query_text):
+    ts = time.strftime('%Y-%m-%d %H:%M:%S')
+    safe_query = re.sub(r'[\r\n]+', ' ', query_text).strip()
+    line = f"{ts} | {username} | {database} | {safe_query}\n"
+    try:
+        with open(QUERY_LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(line)
+    except Exception as e:
+        print(f"[WARN] query log failed: {e}")
+
+
+@app.route('/query', methods=['GET', 'POST'])
+def query_page():
+    if 'user' not in session:
+        return redirect(url_for('login'))
+
+    username = session['user']
+    permissions = load_permissions()
+    sql_servers = load_sql_servers()
+
+    prod_dbs = []  # list of dicts with prefix and db
+    for prefix, dbs in permissions.get(username, {}).items():
+        for db in dbs:
+            prod_dbs.append({'prefix': prefix, 'db': db})
+
+    result = None
+    columns = []
+    error = None
+
+    if request.method == 'POST':
+        selected = request.form.get('database')  # format: prefix::db
+        query_text = request.form.get('query', '').strip()
+
+        if not selected or '::' not in selected:
+            error = "Veritabanı seçimi hatalı."
+        else:
+            prefix, database = selected.split('::', 1)
+            allowed = any(item['prefix'] == prefix and item['db'] == database for item in prod_dbs)
+            if not allowed:
+                error = "Bu veritabanı için izniniz yok."
+            elif not query_text:
+                error = "Sorgu gereklidir."
+            else:
+                ip = sql_servers.get(prefix)
+                if not ip:
+                    error = "Sunucu bulunamadı."
+                else:
+                    try:
+                        conn = get_conn(ip)
+                        cursor = conn.cursor()
+                        cursor.execute(f"USE [{database}]")
+                        cursor.execute(query_text)
+                        rows = cursor.fetchall()
+                        columns = [col[0] for col in cursor.description]
+                        result = [list(row) for row in rows]
+                        conn.close()
+                        log_query(username, f"{prefix}/{database}", query_text)
+                    except Exception as e:
+                        error = f"Sorgu hatası: {e}"
+
+    return render_template(
+        'query.html',
+        username=username,
+        prod_dbs=prod_dbs,
+        result=result,
+        columns=columns,
+        error=error,
+    )
