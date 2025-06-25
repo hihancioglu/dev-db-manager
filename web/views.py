@@ -15,6 +15,27 @@ from web.paths import (
     QUERY_LOG_PATH,
 )
 
+def _detect_external_db(query, target_db):
+    """Return referenced DB name if query points to another database."""
+    use_match = re.search(r"\bUSE\s+(?:\[(?P<br>[^\]]+)\]|(?P<plain>\w+))", query, re.IGNORECASE)
+    if use_match:
+        db = use_match.group('br') or use_match.group('plain')
+        if db.lower() != target_db.lower():
+            return db
+
+    patterns = [
+        re.compile(r"(?:\[(?P<br>[^\]]+)\]|(?P<plain>\w+))\s*\.\s*(?:\w+\s*\.)\s*\w+", re.IGNORECASE),
+        re.compile(r"(?:\[(?P<br>[^\]]+)\]|(?P<plain>\w+))\s*\.\.\s*(?:\[[^\]]+\]|\w+)", re.IGNORECASE),
+    ]
+
+    for pat in patterns:
+        for m in pat.finditer(query):
+            db = m.group('br') or m.group('plain')
+            if db.lower() != target_db.lower():
+                return db
+
+    return None
+
 app = Flask(__name__)
 app.secret_key = 'your-secret-key'
 
@@ -730,27 +751,31 @@ def query_page():
                 if not ip:
                     error = "Sunucu bulunamadı."
                 else:
-                    try:
-                        conn = get_conn(ip)
-                        cursor = conn.cursor()
-                        cursor.execute(f"USE [{database}]")
-                        cursor.execute(query_text)
-                        if cursor.description is None:
-                            result = []
-                            columns = []
-                            message = "Query executed successfully."
-                        else:
-                            rows = cursor.fetchall()
-                            columns = [col[0] for col in cursor.description]
-                            result = [list(row) for row in rows]
-                        log_query(username, f"{prefix}/{database}", query_text)
-                    except Exception as e:
-                        error = f"Sorgu hatası: {e}"
-                    finally:
+                    other_db = _detect_external_db(query_text, database)
+                    if other_db:
+                        error = f"Sorgu içerisinde farklı bir veritabanı ('{other_db}') referansı tespit edildi."
+                    else:
                         try:
-                            conn.close()
-                        except Exception:
-                            pass
+                            conn = get_conn(ip)
+                            cursor = conn.cursor()
+                            cursor.execute(f"USE [{database}]")
+                            cursor.execute(query_text)
+                            if cursor.description is None:
+                                result = []
+                                columns = []
+                                message = "Query executed successfully."
+                            else:
+                                rows = cursor.fetchall()
+                                columns = [col[0] for col in cursor.description]
+                                result = [list(row) for row in rows]
+                            log_query(username, f"{prefix}/{database}", query_text)
+                        except Exception as e:
+                            error = f"Sorgu hatası: {e}"
+                        finally:
+                            try:
+                                conn.close()
+                            except Exception:
+                                pass
 
     return render_template(
         'query.html',
