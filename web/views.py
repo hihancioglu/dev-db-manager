@@ -101,6 +101,22 @@ def load_sql_servers():
         print(f"[ERROR] SQL sunucu listesi yüklenemedi: {e}")
         return {}
 
+def load_query_logs(limit=100):
+    """Read last `limit` lines from query log file."""
+    try:
+        with open(QUERY_LOG_PATH, encoding="utf-8") as f:
+            lines = deque(f, maxlen=limit)
+        logs = []
+        for line in reversed(lines):
+            parts = line.strip().split(" | ", 3)
+            if len(parts) == 4:
+                ts, user, db, query = parts
+                logs.append({"ts": ts, "user": user, "db": db, "query": query})
+        return logs
+    except Exception as e:
+        print(f"[WARN] query log read failed: {e}")
+        return []
+
 def run_backup_restore(prod_db, dev_db, username, source_sql):
     try:
         active_jobs[dev_db] = {"stage": "backup", "percent": 0}
@@ -299,13 +315,16 @@ def admin_panel():
     except:
         pass
 
+    query_logs = load_query_logs()
+
     return render_template(
         "admin.html",
         username=session['user'],
         allowed_users=allowed_users,
         dev_dbs=all_dev_dbs,
         permissions=permissions,
-        prod_dbs_grouped=prod_dbs_grouped
+        prod_dbs_grouped=prod_dbs_grouped,
+        query_logs=query_logs
     )
 
 @app.route('/admin/add-user', methods=['POST'])
