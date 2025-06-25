@@ -6,6 +6,7 @@ from ldap3 import Server, Connection, ALL, NTLM
 import pyodbc
 import os
 import json
+import re
 from web.paths import (
     ALLOWED_USERS_PATH,
     ADMIN_USERS_PATH,
@@ -682,10 +683,11 @@ def cancel_queued():
 
 def log_query(username, database, query_text):
     ts = time.strftime('%Y-%m-%d %H:%M:%S')
-    safe_query = query_text.replace("\n", " ")
+
+    safe_query = re.sub(r'[\r\n]+', ' ', query_text).strip()
     line = f"{ts} | {username} | {database} | {safe_query}\n"
     try:
-        with open(QUERY_LOG_PATH, "a") as f:
+        with open(QUERY_LOG_PATH, "a", encoding="utf-8") as f:
             f.write(line)
     except Exception as e:
         print(f"[WARN] query log failed: {e}")
