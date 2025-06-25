@@ -48,6 +48,17 @@ def _detect_external_db(query, target_db):
 
     return None
 
+# Detect UPDATE/DELETE after optional comments or SET/DECLARE statements
+_DML_START_RE = re.compile(
+    r"^(?:\s*(?:--[^\n]*\n|/\*.*?\*/\s*|(?:SET|DECLARE)\b[^;]*;))*\s*(DELETE|UPDATE)\b",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _starts_with_update_or_delete(sql: str) -> bool:
+    """Return True if sql begins with UPDATE or DELETE after stripping comments and SET/DECLARE."""
+    return bool(_DML_START_RE.match(sql))
+
 app = Flask(__name__)
 app.secret_key = 'your-secret-key'
 
@@ -783,7 +794,7 @@ def query_page():
                             conn = get_conn(ip)
                             cursor = conn.cursor()
                             cursor.execute(f"USE [{database}]")
-                            if re.match(r"^(DELETE|UPDATE)\\b", query_text, re.IGNORECASE):
+                            if _starts_with_update_or_delete(query_text):
                                 cursor.execute("BEGIN TRANSACTION")
                                 cursor.execute(query_text)
                                 cursor.execute("SELECT @@ROWCOUNT AS affected")

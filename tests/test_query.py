@@ -111,6 +111,88 @@ def test_update_shows_confirmation(monkeypatch):
         assert sess['affected'] == 3
 
 
+def test_update_after_comment(monkeypatch):
+    monkeypatch.setattr('web.views.load_permissions', lambda: {'tester': {'main': ['DB1']}})
+    monkeypatch.setattr('web.views.load_sql_servers', lambda: {'main': '10.0.0.1'})
+
+    class FakeCursor:
+        description = None
+
+        def __init__(self):
+            self.affected = 2
+
+        def execute(self, sql, *args, **kwargs):
+            pass
+
+        def fetchone(self):
+            return (self.affected,)
+
+        def fetchmany(self, *args, **kwargs):
+            return []
+
+    class FakeConn:
+        def cursor(self):
+            return FakeCursor()
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr('web.views.get_conn', lambda ip: FakeConn())
+
+    client = app.test_client()
+    with client.session_transaction() as sess:
+        sess['user'] = 'tester'
+
+    query = "-- initial comment\nUPDATE t SET a=1"
+    resp = client.post('/query', data={'database': 'main::DB1', 'query': query}, follow_redirects=True)
+    assert b'id=\"confirmModal\"' in resp.data
+    with client.session_transaction() as sess:
+        assert sess['pending_query'] == query
+        assert sess['pending_db'] == 'main::DB1'
+        assert sess['affected'] == 2
+
+
+def test_delete_after_declare(monkeypatch):
+    monkeypatch.setattr('web.views.load_permissions', lambda: {'tester': {'main': ['DB1']}})
+    monkeypatch.setattr('web.views.load_sql_servers', lambda: {'main': '10.0.0.1'})
+
+    class FakeCursor:
+        description = None
+
+        def __init__(self):
+            self.affected = 1
+
+        def execute(self, sql, *args, **kwargs):
+            pass
+
+        def fetchone(self):
+            return (self.affected,)
+
+        def fetchmany(self, *args, **kwargs):
+            return []
+
+    class FakeConn:
+        def cursor(self):
+            return FakeCursor()
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr('web.views.get_conn', lambda ip: FakeConn())
+
+    client = app.test_client()
+    with client.session_transaction() as sess:
+        sess['user'] = 'tester'
+
+    query = "DECLARE @x INT; DELETE FROM t"
+    resp = client.post('/query', data={'database': 'main::DB1', 'query': query}, follow_redirects=True)
+    assert b'id=\"confirmModal\"' in resp.data
+    with client.session_transaction() as sess:
+        assert sess['pending_query'] == query
+        assert sess['pending_db'] == 'main::DB1'
+        assert sess['affected'] == 1
+
+
 def test_execute_query_uses_session(monkeypatch):
     monkeypatch.setattr('web.views.load_permissions', lambda: {'tester': {'main': ['DB1']}})
     monkeypatch.setattr('web.views.load_sql_servers', lambda: {'main': '10.0.0.1'})
