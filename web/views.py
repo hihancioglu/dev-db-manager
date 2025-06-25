@@ -761,31 +761,32 @@ def query_page():
                             f"Sorgu içerisinde farklı bir veritabanı ('{other_db}') referansı tespit edildi."
                         )
                     else:
+                    try:
+                        conn = get_conn(ip)
+                        cursor = conn.cursor()
+                        cursor.execute(f"USE [{database}]")
+                        cursor.execute(query_text)
+                        if cursor.description is None:
+                            result = []
+                            columns = []
+                            message = "Query executed successfully."
+                        else:
+                            # Fetch up to MAX_ROWS + 1 rows to detect truncation
+                            rows = cursor.fetchmany(MAX_ROWS + 1)
+                            truncated = len(rows) > MAX_ROWS
+                            rows = rows[:MAX_ROWS]
+                            columns = [col[0] for col in cursor.description]
+                            result = [list(row) for row in rows]
+                            if truncated:
+                                message = f"Showing first {MAX_ROWS} rows."
+                        log_query(username, f"{prefix}/{database}", query_text)
+                    except Exception as e:
+                        error = f"Sorgu hatası: {e}"
+                    finally:
                         try:
-                            conn = get_conn(ip)
-                            cursor = conn.cursor()
-                            cursor.execute(f"USE [{database}]")
-                            cursor.execute(query_text)
-                            if cursor.description is None:
-                                result = []
-                                columns = []
-                                message = "Query executed successfully."
-                            else:
-                                rows = cursor.fetchmany(MAX_ROWS + 1)
-                                truncated = len(rows) > MAX_ROWS
-                                rows = rows[:MAX_ROWS]
-                                columns = [col[0] for col in cursor.description]
-                                result = [list(row) for row in rows]
-                                if truncated:
-                                    message = f"Showing first {MAX_ROWS} rows."
-                            log_query(username, f"{prefix}/{database}", query_text)
-                        except Exception as e:
-                            error = f"Sorgu hatası: {e}"
-                        finally:
-                            try:
-                                conn.close()
-                            except Exception:
-                                pass
+                            conn.close()
+                        except Exception:
+                            pass
 
     return render_template(
         'query.html',
