@@ -19,7 +19,7 @@
             <label for="database" class="form-label">Prod Veritabanı</label>
             <select name="database" id="database" class="form-select" required>
                 {% for item in prod_dbs %}
-                <option value="{{ item.prefix }}::{{ item.db }}">{{ item.prefix }} / {{ item.db }}</option>
+                <option value="{{ item.prefix }}::{{ item.db }}" {% if selected_db == item.prefix ~ '::' ~ item.db %}selected{% endif %}>{{ item.prefix }} / {{ item.db }}</option>
                 {% endfor %}
             </select>
         </div>
