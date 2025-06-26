@@ -1,17 +1,18 @@
 from flask import Flask, request, jsonify
 import pyodbc
+import os
 
 app = Flask(__name__)
 
 # SQL bağlantı bilgileri
-PROD_SQL = "10.10.10.61"
-DEV_SQL = "172.35.10.29"
-SQL_USER = "devflask"
-SQL_PASSWORD = "StrongP@ss123"
+PROD_SQL = os.getenv("PROD_SQL_SERVER", "10.10.10.61")
+DEV_SQL = os.getenv("DEV_SQL_SERVER", "172.35.10.29")
+SQL_USER = os.getenv("SQL_USER", "devflask")
+SQL_PASSWORD = os.getenv("SQL_PASSWORD", "StrongP@ss123")
 
 # Dosya yolları
-BACKUP_SHARE_PATH = r"\\172.35.10.29\Backups"
-DEV_DATA_PATH = r"D:\SQLData"
+BACKUP_SHARE_PATH = os.getenv("BACKUP_SHARE_PATH", r"\\172.35.10.29\Backups")
+DEV_DATA_PATH = os.getenv("DEV_DATA_PATH", r"D:\SQLData")
 
 def get_conn(server_ip):
     conn = pyodbc.connect(
