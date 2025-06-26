@@ -62,19 +62,19 @@ def _starts_with_update_or_delete(sql: str) -> bool:
     return bool(_DML_START_RE.match(sql))
 
 app = Flask(__name__)
-app.secret_key = 'your-secret-key'
+app.secret_key = os.getenv("SECRET_KEY", "your-secret-key")
 
 # LDAP ayarları
-LDAP_SERVER = 'ldap://10.0.0.201'
-LDAP_DOMAIN = 'BAYLAN'
+LDAP_SERVER = os.getenv("LDAP_SERVER", "ldap://10.0.0.201")
+LDAP_DOMAIN = os.getenv("LDAP_DOMAIN", "BAYLAN")
 
 # SQL bağlantı bilgileri
-PROD_SQL = "10.10.10.61"
-DEV_SQL = "172.35.10.29"
-SQL_USER = "devflask"
-SQL_PASSWORD = "StrongP@ss123"
-BACKUP_SHARE_PATH = r"\\172.35.10.29\Backups"
-DEV_DATA_PATH = r"D:\SQLData"
+PROD_SQL = os.getenv("PROD_SQL_SERVER", "10.10.10.61")
+DEV_SQL = os.getenv("DEV_SQL_SERVER", "172.35.10.29")
+SQL_USER = os.getenv("SQL_USER", "devflask")
+SQL_PASSWORD = os.getenv("SQL_PASSWORD", "StrongP@ss123")
+BACKUP_SHARE_PATH = os.getenv("BACKUP_SHARE_PATH", r"\\172.35.10.29\Backups")
+DEV_DATA_PATH = os.getenv("DEV_DATA_PATH", r"D:\SQLData")
 
 # Wazuh syslog configuration
 WAZUH_SYSLOG_HOST = os.getenv("WAZUH_SYSLOG_HOST", "127.0.0.1")
