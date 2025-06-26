@@ -79,7 +79,10 @@ DEV_DATA_PATH = os.getenv("DEV_DATA_PATH", r"D:\SQLData")
 # Wazuh syslog configuration
 WAZUH_SYSLOG_HOST = os.getenv("WAZUH_SYSLOG_HOST", "127.0.0.1")
 WAZUH_SYSLOG_PORT = int(os.getenv("WAZUH_SYSLOG_PORT", "514"))
+WAZUH_SYSLOG_PREFIX = os.getenv("WAZUH_SYSLOG_PREFIX", "")
 syslog_handler = SysLogHandler(address=(WAZUH_SYSLOG_HOST, WAZUH_SYSLOG_PORT))
+if WAZUH_SYSLOG_PREFIX:
+    syslog_handler.ident = f"{WAZUH_SYSLOG_PREFIX}: "
 query_logger = logging.getLogger("query_logger")
 query_logger.setLevel(logging.INFO)
 if not query_logger.handlers:

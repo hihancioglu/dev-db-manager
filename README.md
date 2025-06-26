@@ -39,6 +39,7 @@ Aşağıdaki değişkenler `.env` dosyası kullanılarak veya sistem ortam deği
 | `DEV_DATA_PATH`     | Geliştirme sunucusunda .mdf/.ldf dosyalarının tutulacağı klasör | `D:\SQLData` |
 | `WAZUH_SYSLOG_HOST` | (Opsiyonel) Wazuh syslog sunucu adresi     | `127.0.0.1` |
 | `WAZUH_SYSLOG_PORT` | (Opsiyonel) Wazuh syslog portu             | `514` |
+| `WAZUH_SYSLOG_PREFIX` | (Opsiyonel) Syslog mesajı ön eki          | (boş) |
 
 ## Yapılandırma Dosyaları
 
