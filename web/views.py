@@ -7,6 +7,7 @@ import pyodbc
 import os
 import json
 import re
+from web.slack import send_slack_notification
 
 # Maximum number of rows returned from a SELECT query in the UI.
 # Prevents memory issues with extremely large result sets.
@@ -754,6 +755,8 @@ def log_query(username, database, query_text):
             f.write(line)
     except Exception as e:
         print(f"[WARN] query log failed: {e}")
+    if _starts_with_update_or_delete(query_text):
+        send_slack_notification(f"{username}: {safe_query} → {database}")
 
 
 @app.route('/query', methods=['GET', 'POST'])
