@@ -233,3 +233,83 @@ def test_execute_query_uses_session(monkeypatch):
     assert 'UPDATE t SET a=1' in executed
     with client.session_transaction() as sess:
         assert 'pending_query' not in sess
+
+
+def test_slack_called_on_update_execute(monkeypatch):
+    monkeypatch.setattr('web.views.load_permissions', lambda: {'tester': {'main': ['DB1']}})
+    monkeypatch.setattr('web.views.load_sql_servers', lambda: {'main': '10.0.0.1'})
+
+    slack = []
+
+    class FakeCursor:
+        description = None
+
+        def execute(self, sql, *args, **kwargs):
+            pass
+
+        def fetchone(self):
+            return (1,)
+
+        def fetchmany(self, *args, **kwargs):
+            return []
+
+    class FakeConn:
+        def cursor(self):
+            return FakeCursor()
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr('web.views.get_conn', lambda ip: FakeConn())
+    monkeypatch.setattr('web.views.send_slack_notification', lambda msg: slack.append(msg))
+
+    client = app.test_client()
+    with client.session_transaction() as sess:
+        sess['user'] = 'tester'
+        sess['pending_query'] = 'UPDATE t SET a=1'
+        sess['pending_db'] = 'main::DB1'
+        sess['affected'] = 1
+
+    client.post('/execute-query', follow_redirects=True)
+    assert slack
+    assert 'UPDATE t SET a=1' in slack[0]
+
+
+def test_slack_called_on_delete_execute(monkeypatch):
+    monkeypatch.setattr('web.views.load_permissions', lambda: {'tester': {'main': ['DB1']}})
+    monkeypatch.setattr('web.views.load_sql_servers', lambda: {'main': '10.0.0.1'})
+
+    slack = []
+
+    class FakeCursor:
+        description = None
+
+        def execute(self, sql, *args, **kwargs):
+            pass
+
+        def fetchone(self):
+            return (2,)
+
+        def fetchmany(self, *args, **kwargs):
+            return []
+
+    class FakeConn:
+        def cursor(self):
+            return FakeCursor()
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr('web.views.get_conn', lambda ip: FakeConn())
+    monkeypatch.setattr('web.views.send_slack_notification', lambda msg: slack.append(msg))
+
+    client = app.test_client()
+    with client.session_transaction() as sess:
+        sess['user'] = 'tester'
+        sess['pending_query'] = 'DELETE FROM t'
+        sess['pending_db'] = 'main::DB1'
+        sess['affected'] = 2
+
+    client.post('/execute-query', follow_redirects=True)
+    assert slack
+    assert 'DELETE FROM t' in slack[0]

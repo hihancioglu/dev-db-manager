@@ -2,3 +2,4 @@ flask
 pyodbc
 ldap3
 pytest
+requests
