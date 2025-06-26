@@ -1,7 +1,9 @@
 import os
 import sys
+import json
+import logging
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from web.views import app
+from web.views import app, log_query
 
 def test_admin_shows_query_log(monkeypatch):
     monkeypatch.setattr('web.views.is_admin', lambda: True)
@@ -17,4 +19,26 @@ def test_admin_shows_query_log(monkeypatch):
     data = resp.data.decode('utf-8')
     assert 'SQL Sorgu Logu' in data
     assert 'SELECT 1' in data
+
+
+def test_log_query_emits_syslog(monkeypatch):
+    messages = []
+
+    class DummyHandler(logging.Handler):
+        def emit(self, record):
+            messages.append(record.getMessage())
+
+    dummy_logger = logging.getLogger("dummy")
+    dummy_logger.setLevel(logging.INFO)
+    dummy_logger.addHandler(DummyHandler())
+
+    monkeypatch.setattr('web.views.query_logger', dummy_logger)
+
+    log_query('tester', 'main/DB1', 'SELECT 1')
+
+    assert len(messages) == 1
+    data = json.loads(messages[0])
+    assert data['user'] == 'tester'
+    assert data['database'] == 'main/DB1'
+    assert data['query'] == 'SELECT 1'
 

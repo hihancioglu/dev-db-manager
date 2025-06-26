@@ -7,6 +7,8 @@ import pyodbc
 import os
 import json
 import re
+import logging
+from logging.handlers import SysLogHandler
 
 # Maximum number of rows returned from a SELECT query in the UI.
 # Prevents memory issues with extremely large result sets.
@@ -74,6 +76,15 @@ SQL_PASSWORD = "StrongP@ss123"
 BACKUP_SHARE_PATH = r"\\172.35.10.29\Backups"
 DEV_DATA_PATH = r"D:\SQLData"
 
+# Wazuh syslog configuration
+WAZUH_SYSLOG_HOST = os.getenv("WAZUH_SYSLOG_HOST", "127.0.0.1")
+WAZUH_SYSLOG_PORT = int(os.getenv("WAZUH_SYSLOG_PORT", "514"))
+syslog_handler = SysLogHandler(address=(WAZUH_SYSLOG_HOST, WAZUH_SYSLOG_PORT))
+query_logger = logging.getLogger("query_logger")
+query_logger.setLevel(logging.INFO)
+if not query_logger.handlers:
+    query_logger.addHandler(syslog_handler)
+
 active_job = None
 job_queue = deque()
 active_jobs = {}
@@ -108,10 +119,22 @@ def load_query_logs(limit=100):
             lines = deque(f, maxlen=limit)
         logs = []
         for line in reversed(lines):
-            parts = line.strip().split(" | ", 3)
-            if len(parts) == 4:
-                ts, user, db, query = parts
-                logs.append({"ts": ts, "user": user, "db": db, "query": query})
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+                logs.append({
+                    "ts": entry.get("timestamp"),
+                    "user": entry.get("user"),
+                    "db": entry.get("database"),
+                    "query": entry.get("query"),
+                })
+            except json.JSONDecodeError:
+                parts = line.split(" | ", 3)
+                if len(parts) == 4:
+                    ts, user, db, query = parts
+                    logs.append({"ts": ts, "user": user, "db": db, "query": query})
         return logs
     except Exception as e:
         print(f"[WARN] query log read failed: {e}")
@@ -748,12 +771,23 @@ def log_query(username, database, query_text):
     ts = time.strftime('%Y-%m-%d %H:%M:%S')
 
     safe_query = re.sub(r'[\r\n]+', ' ', query_text).strip()
-    line = f"{ts} | {username} | {database} | {safe_query}\n"
+    record = {
+        "timestamp": ts,
+        "user": username,
+        "database": database,
+        "query": safe_query,
+    }
+    line = json.dumps(record, ensure_ascii=False)
     try:
         with open(QUERY_LOG_PATH, "a", encoding="utf-8") as f:
-            f.write(line)
+            f.write(line + "\n")
     except Exception as e:
         print(f"[WARN] query log failed: {e}")
+
+    try:
+        query_logger.info(line)
+    except Exception as e:
+        print(f"[WARN] syslog failed: {e}")
 
 
 @app.route('/query', methods=['GET', 'POST'])
