@@ -56,10 +56,22 @@ _DML_START_RE = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 
+# Detect basic SQL operation after stripping comments and optional SET/DECLARE
+_OPERATION_RE = re.compile(
+    r"^(?:\s*(?:--[^\n]*\n|/\*.*?\*/\s*|(?:SET|DECLARE)\b[^;]*;))*\s*(SELECT|INSERT|UPDATE|DELETE)\b",
+    re.IGNORECASE | re.DOTALL,
+)
+
 
 def _starts_with_update_or_delete(sql: str) -> bool:
     """Return True if sql begins with UPDATE or DELETE after stripping comments and SET/DECLARE."""
     return bool(_DML_START_RE.match(sql))
+
+
+def _detect_operation(sql: str) -> str | None:
+    """Return detected operation (SELECT/INSERT/UPDATE/DELETE) or None."""
+    m = _OPERATION_RE.match(sql)
+    return m.group(1).upper() if m else None
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "your-secret-key")
@@ -263,7 +275,7 @@ def api_tables():
     prefix, database = db_param.split('::', 1)
 
     permissions = load_permissions()
-    allowed = permissions.get(session['user'], {}).get(prefix, [])
+    allowed = permissions.get(session['user'], {}).get(prefix, {})
     if database not in allowed:
         return jsonify({"error": "forbidden"}), 403
 
@@ -508,17 +520,19 @@ def update_permissions():
     if not user:
         return "Geçersiz kullanıcı", 400
 
-    # Kullanıcıya ait yeni sunucu → veritabanı listesi oluştur
+    # Kullanıcıya ait yeni sunucu → veritabanı işlemleri
     new_user_perms = {}
 
     for key in request.form:
         if key.startswith(f"perm-{user}-"):
             _, _, full = key.split("-", 2)
-            if "::" in full:
-                server, db = full.split("::", 1)
-                if server not in new_user_perms:
-                    new_user_perms[server] = []
-                new_user_perms[server].append(db)
+            parts = full.split("::")
+            if len(parts) == 3:
+                server, db, op = parts
+                new_user_perms.setdefault(server, {}).setdefault(db, []).append(op)
+            elif len(parts) == 2:  # eski format desteği
+                server, db = parts
+                new_user_perms.setdefault(server, {}).setdefault(db, ['SELECT', 'INSERT', 'UPDATE', 'DELETE'])
 
     # allow_query flag
     new_user_perms['allow_query'] = request.form.get('allow_query') == 'on'
@@ -555,9 +569,9 @@ def create_dev_db():
 
     # Kullanıcı izin kontrolü (yeni yapı)
     permissions = load_permissions()
-    allowed = permissions.get(username, {}).get(prefix, [])
+    allowed = permissions.get(username, {}).get(prefix, {})
 
-    print(f"[DEBUG] Kullanıcının izinli olduğu DB'ler ({prefix}): {allowed}")
+    print(f"[DEBUG] Kullanıcının izinli oldugu DB'ler ({prefix}): {list(allowed.keys())}")
 
     if prod_db not in allowed:
         print(f"[ERROR] {username} kullanıcısının {prefix} üzerinde {prod_db} yetkisi yok!")
@@ -577,10 +591,15 @@ def load_permissions():
     try:
         with open(PERMISSIONS_PATH) as f:
             data = json.load(f)
-        # Ensure backwards compatibility if allow_query is missing
-        for perms in data.values():
+        # Ensure backwards compatibility for legacy formats
+        for user, perms in data.items():
             if isinstance(perms, dict) and 'allow_query' not in perms:
                 perms['allow_query'] = True
+            for srv, val in list(perms.items()):
+                if srv == 'allow_query':
+                    continue
+                if isinstance(val, list):
+                    perms[srv] = {db: ['SELECT', 'INSERT', 'UPDATE', 'DELETE'] for db in val}
         return data
     except Exception:
         return {}
@@ -642,7 +661,7 @@ def dashboard():
             rows = cursor.fetchall()
             for row in rows:
                 print(f"[DEBUG] {prefix} - {row.name}")
-                if row.name in user_perms.get(prefix, []):
+                if row.name in user_perms.get(prefix, {}):
                     prod_dbs.append({
                         "prefix": prefix,
                         "name": row.name,
@@ -874,7 +893,7 @@ def query_page():
     for prefix, dbs in user_perms.items():
         if prefix == 'allow_query':
             continue
-        for db in dbs:
+        for db in dbs.keys():
             prod_dbs.append({'prefix': prefix, 'db': db})
 
     if not allow_query:
@@ -921,7 +940,7 @@ def query_page():
             error = "Veritabanı seçimi hatalı."
         else:
             prefix, database = selected.split('::', 1)
-            allowed = any(item['prefix'] == prefix and item['db'] == database for item in prod_dbs)
+            allowed = database in user_perms.get(prefix, {})
             if not allowed:
                 error = "Bu veritabanı için izniniz yok."
             elif not query_text:
@@ -937,44 +956,49 @@ def query_page():
                             f"Sorgu içerisinde farklı bir veritabanı ('{other_db}') referansı tespit edildi."
                         )
                     else:
-                        try:
-                            conn = get_conn(ip)
-                            cursor = conn.cursor()
-                            cursor.execute(f"USE [{database}]")
-                            if _starts_with_update_or_delete(query_text):
-                                cursor.execute("BEGIN TRANSACTION")
-                                cursor.execute(query_text)
-                                cursor.execute("SELECT @@ROWCOUNT AS affected")
-                                affected_rows = cursor.fetchone()[0]
-                                cursor.execute("ROLLBACK")
-                                conn.close()
-                                session['pending_query'] = query_text
-                                session['pending_db'] = selected
-                                session['affected'] = affected_rows
-                                pending_query = query_text
-                                show_confirm = True
-                            else:
-                                cursor.execute(query_text)
-                                if cursor.description is None:
-                                    result = []
-                                    columns = []
-                                    message = "Query executed successfully."
-                                else:
-                                    rows = cursor.fetchmany(MAX_ROWS + 1)
-                                    truncated = len(rows) > MAX_ROWS
-                                    rows = rows[:MAX_ROWS]
-                                    columns = [col[0] for col in cursor.description]
-                                    result = [list(row) for row in rows]
-                                    if truncated:
-                                        message = f"Showing first {MAX_ROWS} rows."
-                                log_query(username, f"{prefix}/{database}", query_text)
-                        except Exception as e:
-                            error = f"Sorgu hatası: {e}"
-                        finally:
+                        operation = _detect_operation(query_text) or 'SELECT'
+                        allowed_ops = user_perms.get(prefix, {}).get(database, [])
+                        if operation not in allowed_ops:
+                            error = "Bu işlem için yetkiniz yok."
+                        else:
                             try:
-                                conn.close()
-                            except Exception:
-                                pass
+                                conn = get_conn(ip)
+                                cursor = conn.cursor()
+                                cursor.execute(f"USE [{database}]")
+                                if _starts_with_update_or_delete(query_text):
+                                    cursor.execute("BEGIN TRANSACTION")
+                                    cursor.execute(query_text)
+                                    cursor.execute("SELECT @@ROWCOUNT AS affected")
+                                    affected_rows = cursor.fetchone()[0]
+                                    cursor.execute("ROLLBACK")
+                                    conn.close()
+                                    session['pending_query'] = query_text
+                                    session['pending_db'] = selected
+                                    session['affected'] = affected_rows
+                                    pending_query = query_text
+                                    show_confirm = True
+                                else:
+                                    cursor.execute(query_text)
+                                    if cursor.description is None:
+                                        result = []
+                                        columns = []
+                                        message = "Query executed successfully."
+                                    else:
+                                        rows = cursor.fetchmany(MAX_ROWS + 1)
+                                        truncated = len(rows) > MAX_ROWS
+                                        rows = rows[:MAX_ROWS]
+                                        columns = [col[0] for col in cursor.description]
+                                        result = [list(row) for row in rows]
+                                        if truncated:
+                                            message = f"Showing first {MAX_ROWS} rows."
+                                    log_query(username, f"{prefix}/{database}", query_text)
+                            except Exception as e:
+                                error = f"Sorgu hatası: {e}"
+                            finally:
+                                try:
+                                    conn.close()
+                                except Exception:
+                                    pass
 
     return render_template(
         'query.html',
@@ -1014,14 +1038,14 @@ def execute_query():
     for prefix, dbs in user_perms.items():
         if prefix == 'allow_query':
             continue
-        for db in dbs:
+        for db in dbs.keys():
             prod_dbs.append({'prefix': prefix, 'db': db})
 
     if not allow_query:
         return redirect(url_for('query_page'))
 
     prefix, database = selected.split('::', 1)
-    allowed = any(item['prefix'] == prefix and item['db'] == database for item in prod_dbs)
+    allowed = database in user_perms.get(prefix, {})
 
     result = None
     columns = []
@@ -1041,24 +1065,29 @@ def execute_query():
                     f"Sorgu içerisinde farklı bir veritabanı ('{other_db}') referansı tespit edildi."
                 )
             else:
-                try:
-                    conn = get_conn(ip)
-                    cursor = conn.cursor()
-                    cursor.execute(f"USE [{database}]")
-                    cursor.execute(query_text)
-                    cursor.execute("SELECT @@ROWCOUNT AS affected")
-                    affected = cursor.fetchone()[0]
-                    result = []
-                    columns = []
-                    message = f"Query executed successfully. {affected} rows affected."
-                    log_query(username, f"{prefix}/{database}", query_text)
-                except Exception as e:
-                    error = f"Sorgu hatası: {e}"
-                finally:
+                operation = _detect_operation(query_text) or 'SELECT'
+                allowed_ops = user_perms.get(prefix, {}).get(database, [])
+                if operation not in allowed_ops:
+                    error = "Bu işlem için yetkiniz yok."
+                else:
                     try:
-                        conn.close()
-                    except Exception:
-                        pass
+                        conn = get_conn(ip)
+                        cursor = conn.cursor()
+                        cursor.execute(f"USE [{database}]")
+                        cursor.execute(query_text)
+                        cursor.execute("SELECT @@ROWCOUNT AS affected")
+                        affected = cursor.fetchone()[0]
+                        result = []
+                        columns = []
+                        message = f"Query executed successfully. {affected} rows affected."
+                        log_query(username, f"{prefix}/{database}", query_text)
+                    except Exception as e:
+                        error = f"Sorgu hatası: {e}"
+                    finally:
+                        try:
+                            conn.close()
+                        except Exception:
+                            pass
 
     return render_template(
         'query.html',

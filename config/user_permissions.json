@@ -1,150 +1,515 @@
 {
   "i.hancioglu": {
-    "main": [
-      "KartOkuyucu",
-      "waterworks",
-      "baylandb",
-      "BaylanUretim",
-      "BarkodTakip",
-      "baylan_bms_uretim",
-      "baylan_bms",
-      "CustomerDB",
-      "baylan_automationDB",
-      "baylan_bms_elektrik_uretim",
-      "baylan_bms_lisans"
-    ],
-    "mesafetest": [
-      "BMS",
-      "baylan_bms"
-    ],
-    "allow_query": true
+    "allow_query": true,
+    "main": {
+      "KartOkuyucu": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "waterworks": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "baylandb": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "BaylanUretim": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "BarkodTakip": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "baylan_bms_uretim": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "baylan_bms": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "CustomerDB": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "baylan_automationDB": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "baylan_bms_elektrik_uretim": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "baylan_bms_lisans": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ]
+    },
+    "mesafetest": {
+      "BMS": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "baylan_bms": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ]
+    }
   },
   "e.camdal": {
-    "main": [
-      "baylan_bms_uretim",
-      "baylan_bms",
-      "CustomerDB",
-      "baylan_automationDB",
-      "baylan_bms_elektrik_uretim",
-      "baylan_bms_lisans"
-    ],
-    "allow_query": true
+    "allow_query": true,
+    "main": {
+      "baylan_bms_uretim": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "baylan_bms": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "CustomerDB": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "baylan_automationDB": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "baylan_bms_elektrik_uretim": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "baylan_bms_lisans": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ]
+    }
   },
   "s.yildiz": {
-    "main": [
-      "KartOkuyucu",
-      "waterworks",
-      "baylandb",
-      "BaylanUretim",
-      "BarkodTakip",
-      "baylan_bms_uretim",
-      "baylan_bms",
-      "CustomerDB",
-      "baylan_automationDB",
-      "baylan_bms_elektrik_uretim",
-      "baylan_bms_lisans"
-    ],
-    "mesafetest": [
-      "BMS",
-      "baylan_bms"
-    ],
-    "allow_query": true
+    "allow_query": true,
+    "main": {
+      "KartOkuyucu": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "waterworks": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "baylandb": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "BaylanUretim": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "BarkodTakip": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "baylan_bms_uretim": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "baylan_bms": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "CustomerDB": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "baylan_automationDB": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "baylan_bms_elektrik_uretim": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "baylan_bms_lisans": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ]
+    },
+    "mesafetest": {
+      "BMS": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "baylan_bms": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ]
+    }
   },
   "a.orhon": {
-    "main": [
-      "baylan_bms_uretim",
-      "baylan_bms",
-      "CustomerDB",
-      "baylan_bms_lisans"
-    ],
-    "allow_query": true
+    "allow_query": true,
+    "main": {
+      "baylan_bms_uretim": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "baylan_bms": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "CustomerDB": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "baylan_bms_lisans": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ]
+    }
   },
   "b.ulusoy": {
-    "main": [
-      "baylan_bms_uretim",
-      "baylan_bms",
-      "CustomerDB",
-      "baylan_automationDB",
-      "baylan_bms_elektrik_uretim"
-    ],
-    "mesafetest": [
-      "BMS",
-      "baylan_bms"
-    ],
-    "allow_query": true
+    "allow_query": true,
+    "main": {
+      "baylan_bms_uretim": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "baylan_bms": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "CustomerDB": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "baylan_automationDB": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "baylan_bms_elektrik_uretim": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ]
+    },
+    "mesafetest": {
+      "BMS": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "baylan_bms": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ]
+    }
   },
   "e.cakir": {
-    "main": [
-      "baylan_bms_uretim",
-      "baylan_bms",
-      "CustomerDB"
-    ],
-    "allow_query": true
+    "allow_query": true,
+    "main": {
+      "baylan_bms_uretim": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "baylan_bms": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "CustomerDB": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ]
+    }
   },
   "o.cihangir": {
-    "main": [
-      "baylan_bms_uretim",
-      "baylan_bms",
-      "CustomerDB",
-      "baylan_bms_lisans"
-    ],
-    "allow_query": true
+    "allow_query": true,
+    "main": {
+      "baylan_bms_uretim": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "baylan_bms": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "CustomerDB": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "baylan_bms_lisans": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ]
+    }
   },
   "o.yilmaz": {
-    "main": [
-      "baylan_bms_uretim",
-      "baylan_bms",
-      "CustomerDB",
-      "baylan_bms_elektrik_uretim"
-    ],
-    "mesafetest": [
-      "BMS",
-      "baylan_bms"
-    ],
-    "allow_query": true
+    "allow_query": true,
+    "main": {
+      "baylan_bms_uretim": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "baylan_bms": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "CustomerDB": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "baylan_bms_elektrik_uretim": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ]
+    },
+    "mesafetest": {
+      "BMS": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "baylan_bms": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ]
+    }
   },
   "b.turgut": {
-    "main": [
-      "baylan_bms_uretim",
-      "baylan_bms",
-      "CustomerDB"
-    ],
-    "allow_query": true
+    "allow_query": true,
+    "main": {
+      "baylan_bms_uretim": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "baylan_bms": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "CustomerDB": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ]
+    }
   },
   "g.besiroglu": {
-    "main": [
-      "baylan_bms_uretim",
-      "baylan_bms",
-      "CustomerDB"
-    ],
-    "mesafetest": [
-      "BMS",
-      "baylan_bms"
-    ],
-    "allow_query": true
+    "allow_query": true,
+    "main": {
+      "baylan_bms_uretim": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "baylan_bms": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "CustomerDB": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ]
+    },
+    "mesafetest": {
+      "BMS": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "baylan_bms": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ]
+    }
   },
   "u.gonul": {
-    "main": [
-      "baylan_bms_uretim",
-      "baylan_bms",
-      "CustomerDB"
-    ],
-    "allow_query": true
+    "allow_query": true,
+    "main": {
+      "baylan_bms_uretim": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "baylan_bms": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "CustomerDB": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ]
+    }
   },
   "z.yildiz": {
-    "main": [
-      "baylan_bms_uretim",
-      "baylan_bms",
-      "CustomerDB"
-    ],
-    "allow_query": true
+    "allow_query": true,
+    "main": {
+      "baylan_bms_uretim": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "baylan_bms": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "CustomerDB": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ]
+    }
   },
   "d.deri": {
-    "main": [
-      "baylan_automationDB",
-      "baylan_bms_elektrik_uretim",
-      "baylan_bms_lisans"
-    ],
-    "allow_query": true
+    "allow_query": true,
+    "main": {
+      "baylan_automationDB": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "baylan_bms_elektrik_uretim": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "baylan_bms_lisans": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ]
+    }
   }
 }
