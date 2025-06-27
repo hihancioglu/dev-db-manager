@@ -99,6 +99,7 @@ query_logger = logging.getLogger("query_logger")
 query_logger.setLevel(logging.INFO)
 if not query_logger.handlers:
     query_logger.addHandler(syslog_handler)
+logger = logging.getLogger(__name__)
 
 active_job = None
 job_queue = deque()
@@ -124,7 +125,7 @@ def load_sql_servers():
         with open(SQL_SERVERS_PATH) as f:
             return json.load(f)
     except Exception as e:
-        print(f"[ERROR] SQL sunucu listesi yüklenemedi: {e}")
+        logger.error("SQL sunucu listesi yüklenemedi: %s", e)
         return {}
 
 def load_query_logs(limit=100):
@@ -152,7 +153,7 @@ def load_query_logs(limit=100):
                     logs.append({"ts": ts, "user": user, "db": db, "query": query})
         return logs
     except Exception as e:
-        print(f"[WARN] query log read failed: {e}")
+        logger.warning("query log read failed: %s", e)
         return []
 
 def run_backup_restore(prod_db, dev_db, username, source_sql):
@@ -223,10 +224,10 @@ def run_backup_restore(prod_db, dev_db, username, source_sql):
             conn.commit()
             conn.close()
         except Exception as e:
-            print(f"[WARN] db_owner atanamadı → {dev_db} → {domain_user} → {e}")
+            logger.warning("db_owner atanamadı → %s → %s → %s", dev_db, domain_user, e)
 
     except Exception as e:
-        print(f"[ERROR] {dev_db} işlem hatası: {e}")
+        logger.error("%s işlem hatası: %s", dev_db, e)
     finally:
         active_jobs.pop(dev_db, None)
 
@@ -553,16 +554,16 @@ def create_dev_db():
     username = session['user']
     dev_db = f"{prefix}_{prod_db}_{username}"
 
-    # 🔍 DEBUG
-    print(f"[DEBUG] Kullanıcı: {username}")
-    print(f"[DEBUG] Gelen prefix: {prefix}")
-    print(f"[DEBUG] Gelen prod_db: {prod_db}")
-    print(f"[DEBUG] Oluşturulacak dev_db: {dev_db}")
+    # Diagnostic debug logs
+    logger.debug("Kullanıcı: %s", username)
+    logger.debug("Gelen prefix: %s", prefix)
+    logger.debug("Gelen prod_db: %s", prod_db)
+    logger.debug("Oluşturulacak dev_db: %s", dev_db)
 
     # SQL sunucu IP'lerini al
     servers = load_sql_servers()
     if prefix not in servers:
-        print(f"[ERROR] Tanımsız prefix: {prefix}")
+        logger.error("Tanımsız prefix: %s", prefix)
         return f"Tanımsız sunucu prefix: {prefix}", 400
 
     source_sql = servers[prefix]
@@ -571,10 +572,10 @@ def create_dev_db():
     permissions = load_permissions()
     allowed = permissions.get(username, {}).get(prefix, {})
 
-    print(f"[DEBUG] Kullanıcının izinli oldugu DB'ler ({prefix}): {list(allowed.keys())}")
+    logger.debug("Kullanıcının izinli oldugu DB'ler (%s): %s", prefix, list(allowed.keys()))
 
     if prod_db not in allowed:
-        print(f"[ERROR] {username} kullanıcısının {prefix} üzerinde {prod_db} yetkisi yok!")
+        logger.error("%s kullanıcısının %s üzerinde %s yetkisi yok!", username, prefix, prod_db)
         return "Bu işlemi yapma yetkiniz yok.", 403
 
     # Aynı dev veritabanı zaten işleniyor mu kontrol et
@@ -609,7 +610,7 @@ def save_permissions(permissions):
         with open(PERMISSIONS_PATH, "w") as f:
             json.dump(permissions, f, indent=2)
     except Exception as e:
-        print(f"[ERROR] save_permissions: {e}")
+        logger.error("save_permissions failed: %s", e)
 
 @app.route('/dashboard')
 def dashboard():
@@ -641,12 +642,12 @@ def dashboard():
     # Kullanıcının yetkili olduğu veritabanları (yeni format)
     permissions = load_permissions()
     user_perms = permissions.get(username, {})
-    print(f"[DEBUG] user_perms: {user_perms}")
+    logger.debug("user_perms: %s", user_perms)
 
     prod_dbs = []
 
     for prefix, ip in sql_servers.items():
-        print(f"[DEBUG] checking {prefix} on {ip}")
+        logger.debug("checking %s on %s", prefix, ip)
         try:
             conn = get_conn(ip)
             cursor = conn.cursor()
@@ -660,7 +661,7 @@ def dashboard():
             """)
             rows = cursor.fetchall()
             for row in rows:
-                print(f"[DEBUG] {prefix} - {row.name}")
+                logger.debug("%s - %s", prefix, row.name)
                 if row.name in user_perms.get(prefix, {}):
                     prod_dbs.append({
                         "prefix": prefix,
@@ -669,7 +670,7 @@ def dashboard():
                     })
             conn.close()
         except Exception as e:
-            print(f"[ERROR] {prefix} SQL sunucusundan veritabanları alınamadı → {e}")
+            logger.error("%s SQL sunucusundan veritabanları alınamadı → %s", prefix, e)
 
     return render_template(
         "dashboard.html",
@@ -794,7 +795,7 @@ def progress():
                     "status": "running"
                 })
     except Exception as e:
-        print(f"[BACKUP CHECK ERROR] {e}")
+        logger.error("BACKUP CHECK ERROR %s", e)
 
     # 2. Dev sunucuda restore kontrolü
     try:
@@ -818,7 +819,7 @@ def progress():
                     "status": "running"
                 })
     except Exception as e:
-        print(f"[RESTORE CHECK ERROR] {e}")
+        logger.error("RESTORE CHECK ERROR %s", e)
 
     # İşlem görünmüyorsa tamamlandı kabul et
     return jsonify({
@@ -857,12 +858,12 @@ def log_query(username, database, query_text):
         with open(QUERY_LOG_PATH, "a", encoding="utf-8") as f:
             f.write(line + "\n")
     except Exception as e:
-        print(f"[WARN] query log failed: {e}")
+        logger.warning("query log failed: %s", e)
 
     try:
         query_logger.info(line)
     except Exception as e:
-        print(f"[WARN] syslog failed: {e}")
+        logger.warning("syslog failed: %s", e)
 
 
 def log_action(username, action, **details):
@@ -874,7 +875,7 @@ def log_action(username, action, **details):
     try:
         query_logger.info(line)
     except Exception as e:
-        print(f"[WARN] syslog failed: {e}")
+        logger.warning("syslog failed: %s", e)
 
 
 @app.route('/query', methods=['GET', 'POST'])
