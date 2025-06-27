@@ -250,6 +250,49 @@ def api_my_dev_dbs():
 
     return jsonify({"dev_dbs": dev_dbs})
 
+@app.route('/api/tables')
+def api_tables():
+    """Return list of tables for a given prefix::database."""
+    if 'user' not in session:
+        return jsonify({"error": "unauthorized"}), 403
+
+    db_param = request.args.get('db', '')
+    if '::' not in db_param:
+        return jsonify({"tables": []})
+
+    prefix, database = db_param.split('::', 1)
+
+    permissions = load_permissions()
+    allowed = permissions.get(session['user'], {}).get(prefix, [])
+    if database not in allowed:
+        return jsonify({"error": "forbidden"}), 403
+
+    sql_servers = load_sql_servers()
+    ip = sql_servers.get(prefix)
+    if not ip:
+        return jsonify({"tables": []})
+
+    conn = None
+    try:
+        conn = get_conn(ip)
+        cursor = conn.cursor()
+        cursor.execute(f"USE [{database}]")
+        cursor.execute(
+            "SELECT TABLE_SCHEMA + '.' + TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE'"
+        )
+        rows = cursor.fetchall()
+        tables = [row[0] for row in rows]
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        try:
+            if conn:
+                conn.close()
+        except Exception:
+            pass
+
+    return jsonify({"tables": tables})
+
 @app.route('/')
 def index():
     return redirect(url_for('dashboard'))
