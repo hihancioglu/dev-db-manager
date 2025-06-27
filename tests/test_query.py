@@ -17,6 +17,8 @@ def test_detect_external_db():
     assert _detect_external_db('SELECT * FROM OtherDB.dbo.Table1', 'DB1') == 'OtherDB'
     # cross reference with brackets
     assert _detect_external_db('SELECT * FROM [OtherDB].dbo.Table1', 'DB1') == 'OtherDB'
+    # should ignore matches inside string literals
+    assert _detect_external_db("UPDATE t SET col='2000.01.01 00:00'", 'DB1') is None
 
 
 def test_query_rejects_other_db(monkeypatch):
