@@ -61,15 +61,20 @@
                                     </div>
                                     {% for server, dbs in prod_dbs_grouped.items() %}
                                         <h6 class="mt-2">{{ server }} sunucusu</h6>
-                                        {% set db_list = user_perms.get(server, []) %}
+                                        {% set db_map = user_perms.get(server, {}) %}
                                         {% for db in dbs %}
-                                        <div class="form-check">
-                                            <input class="form-check-input"
-                                                   type="checkbox"
-                                                   name="perm-{{ user }}-{{ server }}::{{ db }}"
-                                                   id="chk-{{ user }}-{{ server }}::{{ db }}"
-                                                   {% if db in db_list %}checked{% endif %}>
-                                            <label class="form-check-label" for="chk-{{ user }}-{{ server }}::{{ db }}">{{ db }}</label>
+                                        {% set ops = db_map.get(db, []) %}
+                                        <div class="mb-2">
+                                            <label class="form-label fw-bold">{{ db }}</label><br>
+                                            {% for op in ['SELECT','INSERT','UPDATE','DELETE'] %}
+                                            <div class="form-check form-check-inline">
+                                                <input class="form-check-input" type="checkbox"
+                                                       name="perm-{{ user }}-{{ server }}::{{ db }}::{{ op }}"
+                                                       id="chk-{{ user }}-{{ server }}::{{ db }}::{{ op }}"
+                                                       {% if op in ops %}checked{% endif %}>
+                                                <label class="form-check-label" for="chk-{{ user }}-{{ server }}::{{ db }}::{{ op }}">{{ op }}</label>
+                                            </div>
+                                            {% endfor %}
                                         </div>
                                         {% endfor %}
                                     {% endfor %}
