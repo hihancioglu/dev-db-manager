@@ -12,6 +12,19 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/sql/sql.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/sql-hint.min.js"></script>
+    <style>
+        #table-list {
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        #table-list .table-name {
+            display: inline-block;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+    </style>
 </head>
 <body class="bg-light">
 <div class="container my-4">
@@ -23,7 +36,7 @@
         </div>
     </div>
     <div class="row">
-        <div class="col-3" id="table-list"></div>
+        <div class="col-3" id="table-list" style="overflow-y:auto;"></div>
         <div class="col-9">
             <form method="post" action="{{ url_for('query_page') }}">
                 <div class="mb-3">
@@ -126,12 +139,19 @@ function loadTableList() {
             const list = document.createElement('ul');
             list.className = 'list-group';
             hintTables = {};
-            (data.tables || []).forEach(tbl => {
+            (data.tables || []).forEach(item => {
                 const li = document.createElement('li');
-                li.className = 'list-group-item py-1';
-                li.textContent = tbl;
+                li.className = 'list-group-item py-1 d-flex justify-content-between';
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'table-name';
+                nameSpan.textContent = item.name;
+                li.appendChild(nameSpan);
+                const badge = document.createElement('span');
+                badge.className = 'badge bg-secondary';
+                badge.textContent = item.type;
+                li.appendChild(badge);
                 list.appendChild(li);
-                hintTables[tbl] = [];
+                hintTables[item.name] = [];
             });
             container.appendChild(list);
             if (editor) editor.setOption('hintOptions', { tables: hintTables });

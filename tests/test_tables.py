@@ -26,7 +26,7 @@ def test_tables_returns_list(monkeypatch):
 
     executed_ip = []
     executed_sql = []
-    tables = [('dbo.Users',), ('dbo.Orders',)]
+    tables = [('dbo.Users', 'BASE TABLE'), ('dbo.Orders', 'VIEW')]
 
     class FakeCursor:
         def execute(self, sql):
@@ -53,7 +53,10 @@ def test_tables_returns_list(monkeypatch):
     resp = client.get('/api/tables?db=main::DB1')
     assert resp.status_code == 200
     data = json.loads(resp.data.decode('utf-8'))
-    assert data['tables'] == ['dbo.Orders', 'dbo.Users']
+    assert data['tables'] == [
+        {'name': 'dbo.Orders', 'type': 'VIEW'},
+        {'name': 'dbo.Users', 'type': 'BASE TABLE'}
+    ]
     assert executed_ip == ['10.0.0.1']
     assert "USE [DB1]" in executed_sql[0]
 
