@@ -27,7 +27,10 @@ from web.paths import (
 
 def _detect_external_db(query, target_db):
     """Return referenced DB name if query points to another database."""
-    use_match = re.search(r"\bUSE\s+(?:\[(?P<br>[^\]]+)\]|(?P<plain>\w+))", query, re.IGNORECASE)
+    # remove text enclosed in single quotes to avoid false positives
+    sanitized = re.sub(r"'[^']*'", "", query)
+
+    use_match = re.search(r"\bUSE\s+(?:\[(?P<br>[^\]]+)\]|(?P<plain>\w+))", sanitized, re.IGNORECASE)
     if use_match:
         db = use_match.group('br') or use_match.group('plain')
         if db.lower() != target_db.lower():
@@ -47,7 +50,7 @@ def _detect_external_db(query, target_db):
     ]
 
     for pat in patterns:
-        for m in pat.finditer(query):
+        for m in pat.finditer(sanitized):
             db = m.group('br') or m.group('plain')
             if db.lower() != target_db.lower():
                 return db
