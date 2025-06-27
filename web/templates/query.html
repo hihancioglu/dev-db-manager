@@ -15,74 +15,103 @@
             <a href="/logout" class="btn btn-outline-danger btn-sm ms-2">Çıkış</a>
         </div>
     </div>
-    <form method="post" action="{{ url_for('query_page') }}">
-        <div class="mb-3">
-            <label for="database" class="form-label">Prod Veritabanı</label>
-            <select name="database" id="database" class="form-select" required>
-                {% for item in prod_dbs %}
-                <option value="{{ item.prefix }}::{{ item.db }}" {% if selected_db == item.prefix ~ '::' ~ item.db %}selected{% endif %}>{{ item.prefix }} / {{ item.db }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="mb-3">
-            <label for="query" class="form-label">Sorgu</label>
-            <textarea name="query" id="query" class="form-control" rows="6" required>{{ request.form.query }}</textarea>
-        </div>
-        <button type="submit" class="btn btn-success">Çalıştır</button>
-    </form>
-    {% if error %}
-    <div class="alert alert-danger mt-3" role="alert">{{ error }}</div>
-    {% endif %}
-    {% if message %}
-    <div class="alert alert-info mt-3">{{ message }}</div>
-    {% endif %}
-    {% if result %}
-    <div class="table-responsive mt-4">
-        <table class="table table-bordered table-sm">
-            <thead>
-                <tr>
-                    {% for col in columns %}
-                    <th>{{ col }}</th>
-                    {% endfor %}
-                </tr>
-            </thead>
-            <tbody>
-                {% for row in result %}
-                <tr>
-                    {% for cell in row %}
-                    <td>{{ cell }}</td>
-                    {% endfor %}
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    {% endif %}
-    {% if show_confirm %}
-    <div class="modal fade" id="confirmModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Sorgu Onayı</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    <div class="row">
+        <div class="col-3" id="table-list"></div>
+        <div class="col-9">
+            <form method="post" action="{{ url_for('query_page') }}">
+                <div class="mb-3">
+                    <label for="database" class="form-label">Prod Veritabanı</label>
+                    <select name="database" id="database" class="form-select" required>
+                        {% for item in prod_dbs %}
+                        <option value="{{ item.prefix }}::{{ item.db }}" {% if selected_db == item.prefix ~ '::' ~ item.db %}selected{% endif %}>{{ item.prefix }} / {{ item.db }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
-                <div class="modal-body">
-                    <p>{{ affected }} kayıt etkilenecek.</p>
-                    <textarea class="form-control" rows="6" readonly>{{ pending_query }}</textarea>
+                <div class="mb-3">
+                    <label for="query" class="form-label">Sorgu</label>
+                    <textarea name="query" id="query" class="form-control" rows="6" required>{{ request.form.query }}</textarea>
                 </div>
-                <div class="modal-footer">
-                    <form method="post" action="{{ url_for('execute_query') }}" class="d-inline">
-                        <button type="submit" class="btn btn-danger">Onayla</button>
-                    </form>
-                    <a href="{{ url_for('query_page') }}" class="btn btn-secondary" data-bs-dismiss="modal">İptal</a>
+                <button type="submit" class="btn btn-success">Çalıştır</button>
+            </form>
+            {% if error %}
+            <div class="alert alert-danger mt-3" role="alert">{{ error }}</div>
+            {% endif %}
+            {% if message %}
+            <div class="alert alert-info mt-3">{{ message }}</div>
+            {% endif %}
+            {% if result %}
+            <div class="table-responsive mt-4">
+                <table class="table table-bordered table-sm">
+                    <thead>
+                        <tr>
+                            {% for col in columns %}
+                            <th>{{ col }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in result %}
+                        <tr>
+                            {% for cell in row %}
+                            <td>{{ cell }}</td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+            {% if show_confirm %}
+            <div class="modal fade" id="confirmModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Sorgu Onayı</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p>{{ affected }} kayıt etkilenecek.</p>
+                            <textarea class="form-control" rows="6" readonly>{{ pending_query }}</textarea>
+                        </div>
+                        <div class="modal-footer">
+                            <form method="post" action="{{ url_for('execute_query') }}" class="d-inline">
+                                <button type="submit" class="btn btn-danger">Onayla</button>
+                            </form>
+                            <a href="{{ url_for('query_page') }}" class="btn btn-secondary" data-bs-dismiss="modal">İptal</a>
+                        </div>
+                    </div>
                 </div>
             </div>
+            {% endif %}
         </div>
     </div>
-    {% endif %}
 </div>
 {% if show_confirm %}
 <script>var m = new bootstrap.Modal(document.getElementById('confirmModal')); m.show();</script>
 {% endif %}
+<script>
+function loadTableList() {
+    const db = document.getElementById('database').value;
+    fetch(`/api/tables?db=${encodeURIComponent(db)}`)
+        .then(res => res.json())
+        .then(data => {
+            const container = document.getElementById('table-list');
+            if (!container) return;
+            container.innerHTML = '';
+            const list = document.createElement('ul');
+            list.className = 'list-group';
+            (data.tables || []).forEach(tbl => {
+                const li = document.createElement('li');
+                li.className = 'list-group-item py-1';
+                li.textContent = tbl;
+                list.appendChild(li);
+            });
+            container.appendChild(list);
+        })
+        .catch(err => console.error('Table list failed', err));
+}
+document.getElementById('database').addEventListener('change', loadTableList);
+window.addEventListener('load', loadTableList);
+</script>
 </body>
 </html>
