@@ -317,6 +317,59 @@ def api_tables():
 
     return jsonify({"tables": tables})
 
+
+@app.route('/api/columns')
+def api_columns():
+    """Return column names and data types for a given table."""
+    if 'user' not in session:
+        return jsonify({"error": "unauthorized"}), 403
+
+    db_param = request.args.get('db', '')
+    table = request.args.get('table', '')
+    if '::' not in db_param or not table:
+        return jsonify({"columns": []})
+
+    prefix, database = db_param.split('::', 1)
+
+    permissions = load_permissions()
+    allowed = permissions.get(session['user'], {}).get(prefix, {})
+    if database not in allowed:
+        return jsonify({"error": "forbidden"}), 403
+
+    sql_servers = load_sql_servers()
+    ip = sql_servers.get(prefix)
+    if not ip:
+        return jsonify({"columns": []})
+
+    schema, _, tbl_name = table.partition('.')
+    if not tbl_name:
+        schema, tbl_name = 'dbo', schema
+
+    conn = None
+    try:
+        conn = get_conn(ip)
+        cursor = conn.cursor()
+        cursor.execute(f"USE [{database}]")
+        cursor.execute(
+            "SELECT COLUMN_NAME, DATA_TYPE "
+            "FROM INFORMATION_SCHEMA.COLUMNS "
+            "WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? "
+            "ORDER BY ORDINAL_POSITION",
+            (schema, tbl_name),
+        )
+        rows = cursor.fetchall()
+        columns = [{"name": row[0], "type": row[1]} for row in rows]
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        try:
+            if conn:
+                conn.close()
+        except Exception:
+            pass
+
+    return jsonify({"columns": columns})
+
 @app.route('/')
 def index():
     return redirect(url_for('dashboard'))
