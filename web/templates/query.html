@@ -18,11 +18,10 @@
             overflow-y: auto;
         }
         #table-list .table-name {
-            display: inline-block;
+            flex-grow: 1;
             max-width: 100%;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
+            white-space: normal;
+            word-break: break-word;
         }
     </style>
 </head>
@@ -36,11 +35,11 @@
         </div>
     </div>
     <div class="row">
-        <div class="col-3">
+        <div class="col-4">
             <div id="table-list" style="overflow-y:auto;"></div>
             <div id="column-info" class="mt-3"></div>
         </div>
-        <div class="col-9">
+        <div class="col-8">
             <form method="post" action="{{ url_for('query_page') }}">
                 <div class="mb-3">
                     <label for="database" class="form-label">Prod Veritabanı</label>
@@ -148,6 +147,7 @@ function loadTableList() {
                 const nameSpan = document.createElement('span');
                 nameSpan.className = 'table-name';
                 nameSpan.textContent = item.name;
+                nameSpan.title = item.name;
                 li.appendChild(nameSpan);
                 const badge = document.createElement('span');
                 badge.className = 'badge bg-secondary';
