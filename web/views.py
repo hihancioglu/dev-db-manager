@@ -523,6 +523,7 @@ def create_dev_db():
     is_active = active_job and active_job["dev_db"] == dev_db
     if not in_queue and not is_active:
         job_queue.append(job)
+        log_action(username, "create_dev_db", prod_db=prod_db, dev_db=dev_db)
 
     return redirect(url_for('dashboard'))
 
@@ -670,6 +671,7 @@ def delete_dev_db():
                 DROP DATABASE [{dev_db}];
             """)
         conn.close()
+        log_action(username, "delete_dev_db", dev_db=dev_db)
         return redirect(url_for('dashboard'))
 
     except Exception as e:
@@ -787,6 +789,18 @@ def log_query(username, database, query_text):
     except Exception as e:
         print(f"[WARN] query log failed: {e}")
 
+    try:
+        query_logger.info(line)
+    except Exception as e:
+        print(f"[WARN] syslog failed: {e}")
+
+
+def log_action(username, action, **details):
+    """Log high level actions such as create/delete via syslog."""
+    ts = time.strftime('%Y-%m-%d %H:%M:%S')
+    record = {"timestamp": ts, "user": username, "action": action}
+    record.update(details)
+    line = json.dumps(record, ensure_ascii=False)
     try:
         query_logger.info(line)
     except Exception as e:
