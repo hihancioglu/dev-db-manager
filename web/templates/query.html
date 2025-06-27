@@ -36,7 +36,10 @@
         </div>
     </div>
     <div class="row">
-        <div class="col-3" id="table-list" style="overflow-y:auto;"></div>
+        <div class="col-3">
+            <div id="table-list" style="overflow-y:auto;"></div>
+            <div id="column-info" class="mt-3"></div>
+        </div>
         <div class="col-9">
             <form method="post" action="{{ url_for('query_page') }}">
                 <div class="mb-3">
@@ -150,6 +153,7 @@ function loadTableList() {
                 badge.className = 'badge bg-secondary';
                 badge.textContent = item.type;
                 li.appendChild(badge);
+                li.addEventListener('click', () => loadColumns(item.name));
                 list.appendChild(li);
                 hintTables[item.name] = [];
             });
@@ -157,6 +161,38 @@ function loadTableList() {
             if (editor) editor.setOption('hintOptions', { tables: hintTables });
         })
         .catch(err => console.error('Table list failed', err));
+}
+
+function loadColumns(tableName) {
+    const db = document.getElementById('database').value;
+    fetch(`/api/columns?db=${encodeURIComponent(db)}&table=${encodeURIComponent(tableName)}`)
+        .then(res => res.json())
+        .then(data => {
+            const info = document.getElementById('column-info');
+            if (!info) return;
+            info.innerHTML = '';
+            const title = document.createElement('h6');
+            title.textContent = tableName;
+            info.appendChild(title);
+            const ul = document.createElement('ul');
+            ul.className = 'list-group';
+            (data.columns || []).forEach(col => {
+                const li = document.createElement('li');
+                li.className = 'list-group-item py-1 d-flex justify-content-between';
+                const nameSpan = document.createElement('span');
+                nameSpan.textContent = col.name;
+                li.appendChild(nameSpan);
+                const badge = document.createElement('span');
+                badge.className = 'badge bg-secondary';
+                badge.textContent = col.type;
+                li.appendChild(badge);
+                ul.appendChild(li);
+            });
+            info.appendChild(ul);
+            hintTables[tableName] = (data.columns || []).map(c => c.name);
+            if (editor) editor.setOption('hintOptions', { tables: hintTables });
+        })
+        .catch(err => console.error('Column list failed', err));
 }
 
 document.getElementById('database').addEventListener('change', loadTableList);
