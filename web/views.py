@@ -298,10 +298,11 @@ def api_tables():
         cursor = conn.cursor()
         cursor.execute(f"USE [{database}]")
         cursor.execute(
-            "SELECT TABLE_SCHEMA + '.' + TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE'"
+            "SELECT TABLE_SCHEMA + '.' + TABLE_NAME FROM INFORMATION_SCHEMA.TABLES "
+            "WHERE TABLE_TYPE='BASE TABLE'"
         )
         rows = cursor.fetchall()
-        tables = [row[0] for row in rows]
+        tables = sorted(row[0] for row in rows)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:

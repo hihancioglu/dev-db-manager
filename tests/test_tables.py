@@ -53,7 +53,7 @@ def test_tables_returns_list(monkeypatch):
     resp = client.get('/api/tables?db=main::DB1')
     assert resp.status_code == 200
     data = json.loads(resp.data.decode('utf-8'))
-    assert data['tables'] == ['dbo.Users', 'dbo.Orders']
+    assert data['tables'] == ['dbo.Orders', 'dbo.Users']
     assert executed_ip == ['10.0.0.1']
     assert "USE [DB1]" in executed_sql[0]
 
