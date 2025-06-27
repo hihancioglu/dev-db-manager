@@ -36,6 +36,11 @@
                                 title="Yetkili DB: {{ permissions.get(user) | join(', ') if permissions.get(user) else 'Yok' }}">
                             Yetkileri Düzenle
                         </button>
+                        <button class="btn btn-sm btn-secondary"
+                                data-bs-toggle="modal"
+                                data-bs-target="#queryModal-{{ safe_user }}">
+                            Sorgu Yetkileri
+                        </button>
                         <form method="post" action="/admin/delete-user" onsubmit="return confirm('Bu kullanıcı silinsin mi?')">
                             <input type="hidden" name="user_to_delete" value="{{ user }}">
                             <button type="submit" class="btn btn-danger btn-sm">Sil</button>
@@ -52,18 +57,17 @@
                                     <h5 class="modal-title">{{ user }} için veritabanı izinleri</h5>
                                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                 </div>
-                                <div class="modal-body">
+                                <div class="modal-body" style="max-height:70vh; overflow-y:auto">
                                     <input type="hidden" name="user" value="{{ user }}">
                                     {% set user_perms = permissions.get(user, {}) %}
                                     <div class="form-check form-switch mb-3">
                                         <input class="form-check-input" type="checkbox" id="allow-{{ safe_user }}" name="allow_query" {% if user_perms.get('allow_query', True) %}checked{% endif %}>
                                         <label class="form-check-label" for="allow-{{ safe_user }}">Sorgu Çalıştırma İzni</label>
                                     </div>
-                                    {% for server, dbs in prod_dbs_grouped.items() %}
+                                    {% for server, db_map in user_perms.items() %}
+                                        {% if server != 'allow_query' %}
                                         <h6 class="mt-2">{{ server }} sunucusu</h6>
-                                        {% set db_map = user_perms.get(server, {}) %}
-                                        {% for db in dbs %}
-                                        {% set ops = db_map.get(db, []) %}
+                                        {% for db, ops in db_map.items() %}
                                         <div class="mb-2">
                                             <label class="form-label fw-bold">{{ db }}</label><br>
                                             {% for op in ['SELECT','INSERT','UPDATE','DELETE'] %}
@@ -77,6 +81,46 @@
                                             {% endfor %}
                                         </div>
                                         {% endfor %}
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="submit" class="btn btn-success">Kaydet</button>
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Kapat</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <!-- Modal: Sorgu Yetkileri -->
+                <div class="modal fade" id="queryModal-{{ safe_user }}" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-scrollable">
+                        <div class="modal-content">
+                            <form method="post" action="/admin/update-permissions">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">{{ user }} sorgu yetkileri</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body" style="max-height:70vh; overflow-y:auto">
+                                    <input type="hidden" name="user" value="{{ user }}">
+                                    {% for server, db_map in permissions.get(user, {}).items() %}
+                                        {% if server != 'allow_query' %}
+                                        <h6 class="mt-2">{{ server }} sunucusu</h6>
+                                        {% for db, ops in db_map.items() %}
+                                            <div class="mb-2">
+                                                <label class="form-label fw-bold">{{ db }}</label><br>
+                                                {% for op in ['SELECT','INSERT','UPDATE','DELETE'] %}
+                                                <div class="form-check form-check-inline">
+                                                    <input class="form-check-input" type="checkbox"
+                                                           name="perm-{{ user }}-{{ server }}::{{ db }}::{{ op }}"
+                                                           id="qchk-{{ user }}-{{ server }}::{{ db }}::{{ op }}"
+                                                           {% if op in ops %}checked{% endif %}>
+                                                    <label class="form-check-label" for="qchk-{{ user }}-{{ server }}::{{ db }}::{{ op }}">{{ op }}</label>
+                                                </div>
+                                                {% endfor %}
+                                            </div>
+                                        {% endfor %}
+                                        {% endif %}
                                     {% endfor %}
                                 </div>
                                 <div class="modal-footer">
