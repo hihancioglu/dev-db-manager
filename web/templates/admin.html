@@ -61,7 +61,8 @@
                                     <input type="hidden" name="user" value="{{ user }}">
                                     {% set user_perms = permissions.get(user, {}) %}
                                     <div class="form-check form-switch mb-3">
-                                        <input class="form-check-input" type="checkbox" id="allow-{{ safe_user }}" name="allow_query" {% if user_perms.get('allow_query', True) %}checked{% endif %}>
+                                        <input class="form-check-input" type="checkbox" id="allow-{{ safe_user }}" name="allow_query" value="on" {% if user_perms.get('allow_query', True) %}checked{% endif %}>
+                                        <input type="hidden" name="allow_query" value="off">
                                         <label class="form-check-label" for="allow-{{ safe_user }}">Sorgu Çalıştırma İzni</label>
                                     </div>
                                     {% for server, dbs in prod_dbs_grouped.items() %}

@@ -96,3 +96,19 @@ def test_update_permissions_preserves_ops(monkeypatch):
 
     assert saved['user1']['main']['DB1'] == ['SELECT', 'INSERT']
 
+
+def test_update_permissions_disable_allow_query(monkeypatch):
+    perms = {'user1': {'allow_query': True, 'main': {}}}
+    saved = {}
+    monkeypatch.setattr('web.views.is_admin', lambda: True)
+    monkeypatch.setattr('web.views.load_permissions', lambda: json.loads(json.dumps(perms)))
+    monkeypatch.setattr('web.views.save_permissions', lambda p: saved.update(p))
+
+    client = app.test_client()
+    with client.session_transaction() as sess:
+        sess['user'] = 'admin'
+
+    client.post('/admin/update-permissions', data={'user': 'user1', 'allow_query': 'off'})
+
+    assert saved['user1']['allow_query'] is False
+
