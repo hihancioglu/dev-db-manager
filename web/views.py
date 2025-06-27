@@ -6,6 +6,7 @@ from ldap3 import Server, Connection, ALL, NTLM
 import pyodbc
 import os
 import json
+import copy
 import re
 import logging
 from logging.handlers import SysLogHandler
@@ -531,14 +532,21 @@ def update_permissions():
     else:
         allow_query = current_perms.get('allow_query', True)
 
-    new_user_perms = {}
-    selected_dbs = set()
+    # Eğer formda db- alanı varsa, kopyalama izinleri güncelleniyor demektir
+    updating_copy = any(k.startswith(f"db-{user}-") for k in request.form)
+
+    if updating_copy:
+        new_user_perms = {}
+    else:
+        # mevcut izinleri koru
+        new_user_perms = copy.deepcopy(current_perms)
+
+    ops_by_db = {}
 
     for key in request.form:
         if key.startswith(f"db-{user}-"):
             _, _, full = key.split("-", 2)
             server, db = full.split("::")
-            selected_dbs.add((server, db))
             ops = current_perms.get(server, {}).get(db, DEFAULT_OPS)
             new_user_perms.setdefault(server, {})[db] = ops
         elif key.startswith(f"perm-{user}-"):
@@ -546,24 +554,22 @@ def update_permissions():
             parts = full.split("::")
             if len(parts) == 3:
                 server, db, op = parts
-                new_user_perms.setdefault(server, {}).setdefault(db, set()).add(op)
-                selected_dbs.add((server, db))
+                ops_by_db.setdefault((server, db), set()).add(op)
             elif len(parts) == 2:  # eski format desteği
                 server, db = parts
-                new_user_perms.setdefault(server, {})[db] = set(DEFAULT_OPS)
-                selected_dbs.add((server, db))
+                ops_by_db.setdefault((server, db), set()).update(DEFAULT_OPS)
 
-    for server, db in selected_dbs:
-        new_user_perms.setdefault(server, {})
-        if db not in new_user_perms[server]:
-            new_user_perms[server][db] = current_perms.get(server, {}).get(db, DEFAULT_OPS)
+    for (server, db), ops in ops_by_db.items():
+        new_user_perms.setdefault(server, {})[db] = sorted(ops)
 
-    for server, dbs in new_user_perms.items():
-        if server == 'allow_query':
-            continue
-        for db, ops in dbs.items():
-            if isinstance(ops, set):
-                new_user_perms[server][db] = sorted(ops)
+    if not updating_copy:
+        # Sorgu yetkisi güncellemesinde, hiçbir op gönderilmeyen DB'leri boş liste yap
+        for server, dbs in current_perms.items():
+            if server == 'allow_query':
+                continue
+            for db in dbs:
+                if (server, db) not in ops_by_db:
+                    new_user_perms.setdefault(server, {})[db] = []
 
     new_user_perms['allow_query'] = allow_query
 
