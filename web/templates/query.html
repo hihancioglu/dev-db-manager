@@ -15,7 +15,7 @@
             <a href="/logout" class="btn btn-outline-danger btn-sm ms-2">Çıkış</a>
         </div>
     </div>
-    <form method="post">
+    <form method="post" action="{{ url_for('query_page') }}">
         <div class="mb-3">
             <label for="database" class="form-label">Prod Veritabanı</label>
             <select name="database" id="database" class="form-select" required>
