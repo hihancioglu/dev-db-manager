@@ -523,17 +523,29 @@ def update_permissions():
 
     # Kullanıcıya ait yeni sunucu → veritabanı işlemleri
     new_user_perms = {}
+    selected_dbs = set()
 
     for key in request.form:
-        if key.startswith(f"perm-{user}-"):
+        if key.startswith(f"db-{user}-"):
+            _, _, full = key.split("-", 2)
+            server, db = full.split("::")
+            selected_dbs.add((server, db))
+            new_user_perms.setdefault(server, {})
+        elif key.startswith(f"perm-{user}-"):
             _, _, full = key.split("-", 2)
             parts = full.split("::")
             if len(parts) == 3:
                 server, db, op = parts
                 new_user_perms.setdefault(server, {}).setdefault(db, []).append(op)
+                selected_dbs.add((server, db))
             elif len(parts) == 2:  # eski format desteği
                 server, db = parts
                 new_user_perms.setdefault(server, {}).setdefault(db, ['SELECT', 'INSERT', 'UPDATE', 'DELETE'])
+                selected_dbs.add((server, db))
+
+    # Boş operasyon da olsa seçilen veritabanları ekle
+    for server, db in selected_dbs:
+        new_user_perms.setdefault(server, {}).setdefault(db, new_user_perms.get(server, {}).get(db, []))
 
     # allow_query flag
     new_user_perms['allow_query'] = request.form.get('allow_query') == 'on'
