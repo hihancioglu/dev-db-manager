@@ -671,6 +671,7 @@ def dashboard():
     # Kullanıcının yetkili olduğu veritabanları (yeni format)
     permissions = load_permissions()
     user_perms = permissions.get(username, {})
+    allow_query = user_perms.get('allow_query', True)
     logger.debug("user_perms: %s", user_perms)
 
     prod_dbs = []
@@ -708,7 +709,8 @@ def dashboard():
         dev_dbs=dev_dbs,
         active_job=active_job,
         job_queue=list(job_queue),
-        is_admin=is_admin()
+        is_admin=is_admin(),
+        allow_query=allow_query
     )
 
 @app.route('/delete', methods=['POST'])
