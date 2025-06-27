@@ -300,3 +300,21 @@ def test_operation_allowed(monkeypatch):
     resp = client.post('/query', data={'database': 'main::DB1', 'query': 'INSERT INTO t(a) VALUES (1)'}, follow_redirects=True)
     assert resp.status_code == 200
 
+
+def test_block_unknown_operation(monkeypatch):
+    perms = {'tester': {'allow_query': True, 'main': {'DB1': ALL_OPS}}}
+    monkeypatch.setattr('web.views.load_permissions', lambda: perms)
+    monkeypatch.setattr('web.views.load_sql_servers', lambda: {'main': '10.0.0.1'})
+
+    def fake_get_conn(ip):
+        raise AssertionError('should not run query')
+
+    monkeypatch.setattr('web.views.get_conn', fake_get_conn)
+
+    client = app.test_client()
+    with client.session_transaction() as sess:
+        sess['user'] = 'tester'
+
+    resp = client.post('/query', data={'database': 'main::DB1', 'query': 'DROP TABLE t'}, follow_redirects=True)
+    assert b'sadece select' in resp.data.lower()
+
