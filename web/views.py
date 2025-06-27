@@ -520,6 +520,9 @@ def update_permissions():
                     new_user_perms[server] = []
                 new_user_perms[server].append(db)
 
+    # allow_query flag
+    new_user_perms['allow_query'] = request.form.get('allow_query') == 'on'
+
     # permissions.json içine güncel olarak kaydet
     permissions[user] = new_user_perms
     save_permissions(permissions)
@@ -573,7 +576,12 @@ def create_dev_db():
 def load_permissions():
     try:
         with open(PERMISSIONS_PATH) as f:
-            return json.load(f)
+            data = json.load(f)
+        # Ensure backwards compatibility if allow_query is missing
+        for perms in data.values():
+            if isinstance(perms, dict) and 'allow_query' not in perms:
+                perms['allow_query'] = True
+        return data
     except Exception:
         return {}
 
@@ -859,10 +867,36 @@ def query_page():
     permissions = load_permissions()
     sql_servers = load_sql_servers()
 
+    user_perms = permissions.get(username, {})
+    allow_query = user_perms.get('allow_query', True)
+
     prod_dbs = []  # list of dicts with prefix and db
-    for prefix, dbs in permissions.get(username, {}).items():
+    for prefix, dbs in user_perms.items():
+        if prefix == 'allow_query':
+            continue
         for db in dbs:
             prod_dbs.append({'prefix': prefix, 'db': db})
+
+    if not allow_query:
+        return redirect(url_for('query_page'))
+
+    if not allow_query:
+        return redirect(url_for('query_page'))
+
+    if not allow_query:
+        return render_template(
+            'query.html',
+            username=username,
+            prod_dbs=prod_dbs,
+            result=None,
+            columns=[],
+            error="Sorgu çalıştırma izniniz yok.",
+            message=None,
+            selected_db="",
+            show_confirm=False,
+            pending_query=None,
+            affected=None,
+        )
 
     result = None
     columns = []
@@ -973,10 +1007,18 @@ def execute_query():
     permissions = load_permissions()
     sql_servers = load_sql_servers()
 
+    user_perms = permissions.get(username, {})
+    allow_query = user_perms.get('allow_query', True)
+
     prod_dbs = []
-    for prefix, dbs in permissions.get(username, {}).items():
+    for prefix, dbs in user_perms.items():
+        if prefix == 'allow_query':
+            continue
         for db in dbs:
             prod_dbs.append({'prefix': prefix, 'db': db})
+
+    if not allow_query:
+        return redirect(url_for('query_page'))
 
     prefix, database = selected.split('::', 1)
     allowed = any(item['prefix'] == prefix and item['db'] == database for item in prod_dbs)

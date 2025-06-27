@@ -16,7 +16,8 @@
     "mesafetest": [
       "BMS",
       "baylan_bms"
-    ]
+    ],
+    "allow_query": true
   },
   "e.camdal": {
     "main": [
@@ -26,7 +27,8 @@
       "baylan_automationDB",
       "baylan_bms_elektrik_uretim",
       "baylan_bms_lisans"
-    ]
+    ],
+    "allow_query": true
   },
   "s.yildiz": {
     "main": [
@@ -45,7 +47,8 @@
     "mesafetest": [
       "BMS",
       "baylan_bms"
-    ]
+    ],
+    "allow_query": true
   },
   "a.orhon": {
     "main": [
@@ -53,7 +56,8 @@
       "baylan_bms",
       "CustomerDB",
       "baylan_bms_lisans"
-    ]
+    ],
+    "allow_query": true
   },
   "b.ulusoy": {
     "main": [
@@ -66,14 +70,16 @@
     "mesafetest": [
       "BMS",
       "baylan_bms"
-    ]
+    ],
+    "allow_query": true
   },
   "e.cakir": {
     "main": [
       "baylan_bms_uretim",
       "baylan_bms",
       "CustomerDB"
-    ]
+    ],
+    "allow_query": true
   },
   "o.cihangir": {
     "main": [
@@ -81,7 +87,8 @@
       "baylan_bms",
       "CustomerDB",
       "baylan_bms_lisans"
-    ]
+    ],
+    "allow_query": true
   },
   "o.yilmaz": {
     "main": [
@@ -93,14 +100,16 @@
     "mesafetest": [
       "BMS",
       "baylan_bms"
-    ]
+    ],
+    "allow_query": true
   },
   "b.turgut": {
     "main": [
       "baylan_bms_uretim",
       "baylan_bms",
       "CustomerDB"
-    ]
+    ],
+    "allow_query": true
   },
   "g.besiroglu": {
     "main": [
@@ -111,27 +120,31 @@
     "mesafetest": [
       "BMS",
       "baylan_bms"
-    ]
+    ],
+    "allow_query": true
   },
   "u.gonul": {
     "main": [
       "baylan_bms_uretim",
       "baylan_bms",
       "CustomerDB"
-    ]
+    ],
+    "allow_query": true
   },
   "z.yildiz": {
     "main": [
       "baylan_bms_uretim",
       "baylan_bms",
       "CustomerDB"
-    ]
+    ],
+    "allow_query": true
   },
   "d.deri": {
     "main": [
       "baylan_automationDB",
       "baylan_bms_elektrik_uretim",
       "baylan_bms_lisans"
-    ]
+    ],
+    "allow_query": true
   }
 }
