@@ -64,3 +64,35 @@ def test_log_action_emits_syslog(monkeypatch):
     assert data['action'] == 'create_dev_db'
     assert data['dev_db'] == 'main_BMS_tester'
 
+
+def test_update_permissions_keep_allow_query(monkeypatch):
+    perms = {'user1': {'allow_query': False, 'main': {'DB1': ['SELECT']}}}
+    saved = {}
+    monkeypatch.setattr('web.views.is_admin', lambda: True)
+    monkeypatch.setattr('web.views.load_permissions', lambda: json.loads(json.dumps(perms)))
+    monkeypatch.setattr('web.views.save_permissions', lambda p: saved.update(p))
+
+    client = app.test_client()
+    with client.session_transaction() as sess:
+        sess['user'] = 'admin'
+
+    client.post('/admin/update-permissions', data={'user': 'user1', 'db-user1-main::DB1': 'on'})
+
+    assert saved['user1']['allow_query'] is False
+
+
+def test_update_permissions_preserves_ops(monkeypatch):
+    perms = {'user1': {'allow_query': True, 'main': {'DB1': ['SELECT', 'INSERT']}}}
+    saved = {}
+    monkeypatch.setattr('web.views.is_admin', lambda: True)
+    monkeypatch.setattr('web.views.load_permissions', lambda: json.loads(json.dumps(perms)))
+    monkeypatch.setattr('web.views.save_permissions', lambda p: saved.update(p))
+
+    client = app.test_client()
+    with client.session_transaction() as sess:
+        sess['user'] = 'admin'
+
+    client.post('/admin/update-permissions', data={'user': 'user1', 'db-user1-main::DB1': 'on'})
+
+    assert saved['user1']['main']['DB1'] == ['SELECT', 'INSERT']
+

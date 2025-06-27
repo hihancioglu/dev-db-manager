@@ -13,6 +13,9 @@ from logging.handlers import SysLogHandler
 # Maximum number of rows returned from a SELECT query in the UI.
 # Prevents memory issues with extremely large result sets.
 MAX_ROWS = 10000
+
+# Default allowed operations for new permissions entries
+DEFAULT_OPS = ["SELECT", "INSERT", "UPDATE", "DELETE"]
 from web.paths import (
     ALLOWED_USERS_PATH,
     ADMIN_USERS_PATH,
@@ -521,7 +524,13 @@ def update_permissions():
     if not user:
         return "Geçersiz kullanıcı", 400
 
-    # Kullanıcıya ait yeni sunucu → veritabanı işlemleri
+    current_perms = permissions.get(user, {})
+
+    if 'allow_query' in request.form:
+        allow_query = request.form.get('allow_query') == 'on'
+    else:
+        allow_query = current_perms.get('allow_query', True)
+
     new_user_perms = {}
     selected_dbs = set()
 
@@ -530,25 +539,33 @@ def update_permissions():
             _, _, full = key.split("-", 2)
             server, db = full.split("::")
             selected_dbs.add((server, db))
-            new_user_perms.setdefault(server, {})
+            ops = current_perms.get(server, {}).get(db, DEFAULT_OPS)
+            new_user_perms.setdefault(server, {})[db] = ops
         elif key.startswith(f"perm-{user}-"):
             _, _, full = key.split("-", 2)
             parts = full.split("::")
             if len(parts) == 3:
                 server, db, op = parts
-                new_user_perms.setdefault(server, {}).setdefault(db, []).append(op)
+                new_user_perms.setdefault(server, {}).setdefault(db, set()).add(op)
                 selected_dbs.add((server, db))
             elif len(parts) == 2:  # eski format desteği
                 server, db = parts
-                new_user_perms.setdefault(server, {}).setdefault(db, ['SELECT', 'INSERT', 'UPDATE', 'DELETE'])
+                new_user_perms.setdefault(server, {})[db] = set(DEFAULT_OPS)
                 selected_dbs.add((server, db))
 
-    # Boş operasyon da olsa seçilen veritabanları ekle
     for server, db in selected_dbs:
-        new_user_perms.setdefault(server, {}).setdefault(db, new_user_perms.get(server, {}).get(db, []))
+        new_user_perms.setdefault(server, {})
+        if db not in new_user_perms[server]:
+            new_user_perms[server][db] = current_perms.get(server, {}).get(db, DEFAULT_OPS)
 
-    # allow_query flag
-    new_user_perms['allow_query'] = request.form.get('allow_query') == 'on'
+    for server, dbs in new_user_perms.items():
+        if server == 'allow_query':
+            continue
+        for db, ops in dbs.items():
+            if isinstance(ops, set):
+                new_user_perms[server][db] = sorted(ops)
+
+    new_user_perms['allow_query'] = allow_query
 
     # permissions.json içine güncel olarak kaydet
     permissions[user] = new_user_perms
