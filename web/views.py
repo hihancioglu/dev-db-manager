@@ -988,49 +988,52 @@ def query_page():
                             f"Sorgu içerisinde farklı bir veritabanı ('{other_db}') referansı tespit edildi."
                         )
                     else:
-                        operation = _detect_operation(query_text) or 'SELECT'
-                        allowed_ops = user_perms.get(prefix, {}).get(database, [])
-                        if operation not in allowed_ops:
-                            error = "Bu işlem için yetkiniz yok."
+                        operation = _detect_operation(query_text)
+                        if operation is None:
+                            error = "Sadece SELECT, INSERT, UPDATE ve DELETE sorgularına izin verilir."
                         else:
-                            try:
-                                conn = get_conn(ip)
-                                cursor = conn.cursor()
-                                cursor.execute(f"USE [{database}]")
-                                if _starts_with_update_or_delete(query_text):
-                                    cursor.execute("BEGIN TRANSACTION")
-                                    cursor.execute(query_text)
-                                    cursor.execute("SELECT @@ROWCOUNT AS affected")
-                                    affected_rows = cursor.fetchone()[0]
-                                    cursor.execute("ROLLBACK")
-                                    conn.close()
-                                    session['pending_query'] = query_text
-                                    session['pending_db'] = selected
-                                    session['affected'] = affected_rows
-                                    pending_query = query_text
-                                    show_confirm = True
-                                else:
-                                    cursor.execute(query_text)
-                                    if cursor.description is None:
-                                        result = []
-                                        columns = []
-                                        message = "Query executed successfully."
-                                    else:
-                                        rows = cursor.fetchmany(MAX_ROWS + 1)
-                                        truncated = len(rows) > MAX_ROWS
-                                        rows = rows[:MAX_ROWS]
-                                        columns = [col[0] for col in cursor.description]
-                                        result = [list(row) for row in rows]
-                                        if truncated:
-                                            message = f"Showing first {MAX_ROWS} rows."
-                                    log_query(username, f"{prefix}/{database}", query_text)
-                            except Exception as e:
-                                error = f"Sorgu hatası: {e}"
-                            finally:
+                            allowed_ops = user_perms.get(prefix, {}).get(database, [])
+                            if operation not in allowed_ops:
+                                error = "Bu işlem için yetkiniz yok."
+                            else:
                                 try:
-                                    conn.close()
-                                except Exception:
-                                    pass
+                                    conn = get_conn(ip)
+                                    cursor = conn.cursor()
+                                    cursor.execute(f"USE [{database}]")
+                                    if _starts_with_update_or_delete(query_text):
+                                        cursor.execute("BEGIN TRANSACTION")
+                                        cursor.execute(query_text)
+                                        cursor.execute("SELECT @@ROWCOUNT AS affected")
+                                        affected_rows = cursor.fetchone()[0]
+                                        cursor.execute("ROLLBACK")
+                                        conn.close()
+                                        session['pending_query'] = query_text
+                                        session['pending_db'] = selected
+                                        session['affected'] = affected_rows
+                                        pending_query = query_text
+                                        show_confirm = True
+                                    else:
+                                        cursor.execute(query_text)
+                                        if cursor.description is None:
+                                            result = []
+                                            columns = []
+                                            message = "Query executed successfully."
+                                        else:
+                                            rows = cursor.fetchmany(MAX_ROWS + 1)
+                                            truncated = len(rows) > MAX_ROWS
+                                            rows = rows[:MAX_ROWS]
+                                            columns = [col[0] for col in cursor.description]
+                                            result = [list(row) for row in rows]
+                                            if truncated:
+                                                message = f"Showing first {MAX_ROWS} rows."
+                                        log_query(username, f"{prefix}/{database}", query_text)
+                                except Exception as e:
+                                    error = f"Sorgu hatası: {e}"
+                                finally:
+                                    try:
+                                        conn.close()
+                                    except Exception:
+                                        pass
 
     return render_template(
         'query.html',
@@ -1097,29 +1100,32 @@ def execute_query():
                     f"Sorgu içerisinde farklı bir veritabanı ('{other_db}') referansı tespit edildi."
                 )
             else:
-                operation = _detect_operation(query_text) or 'SELECT'
-                allowed_ops = user_perms.get(prefix, {}).get(database, [])
-                if operation not in allowed_ops:
-                    error = "Bu işlem için yetkiniz yok."
+                operation = _detect_operation(query_text)
+                if operation is None:
+                    error = "Sadece SELECT, INSERT, UPDATE ve DELETE sorgularına izin verilir."
                 else:
-                    try:
-                        conn = get_conn(ip)
-                        cursor = conn.cursor()
-                        cursor.execute(f"USE [{database}]")
-                        cursor.execute(query_text)
-                        cursor.execute("SELECT @@ROWCOUNT AS affected")
-                        affected = cursor.fetchone()[0]
-                        result = []
-                        columns = []
-                        message = f"Query executed successfully. {affected} rows affected."
-                        log_query(username, f"{prefix}/{database}", query_text)
-                    except Exception as e:
-                        error = f"Sorgu hatası: {e}"
-                    finally:
+                    allowed_ops = user_perms.get(prefix, {}).get(database, [])
+                    if operation not in allowed_ops:
+                        error = "Bu işlem için yetkiniz yok."
+                    else:
                         try:
-                            conn.close()
-                        except Exception:
-                            pass
+                            conn = get_conn(ip)
+                            cursor = conn.cursor()
+                            cursor.execute(f"USE [{database}]")
+                            cursor.execute(query_text)
+                            cursor.execute("SELECT @@ROWCOUNT AS affected")
+                            affected = cursor.fetchone()[0]
+                            result = []
+                            columns = []
+                            message = f"Query executed successfully. {affected} rows affected."
+                            log_query(username, f"{prefix}/{database}", query_text)
+                        except Exception as e:
+                            error = f"Sorgu hatası: {e}"
+                        finally:
+                            try:
+                                conn.close()
+                            except Exception:
+                                pass
 
     return render_template(
         'query.html',
