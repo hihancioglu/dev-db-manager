@@ -18,7 +18,7 @@ def test_detect_external_db():
 
 
 def test_query_rejects_other_db(monkeypatch):
-    monkeypatch.setattr('web.views.load_permissions', lambda: {'tester': {'main': ['DB1']}})
+    monkeypatch.setattr('web.views.load_permissions', lambda: {'tester': {'allow_query': True, 'main': ['DB1']}})
     monkeypatch.setattr('web.views.load_sql_servers', lambda: {'main': '10.0.0.1'})
 
     def fake_get_conn(ip):
@@ -35,7 +35,7 @@ def test_query_rejects_other_db(monkeypatch):
 
 
 def test_selected_db_in_response(monkeypatch):
-    monkeypatch.setattr('web.views.load_permissions', lambda: {'tester': {'main': ['DB1']}})
+    monkeypatch.setattr('web.views.load_permissions', lambda: {'tester': {'allow_query': True, 'main': ['DB1']}})
     monkeypatch.setattr('web.views.load_sql_servers', lambda: {'main': '10.0.0.1'})
 
     def fake_get_conn(ip):
@@ -71,8 +71,20 @@ def test_selected_db_in_response(monkeypatch):
     assert '<option value="main::DB1" selected>' in html
 
 
+def test_query_blocked_when_disabled(monkeypatch):
+    monkeypatch.setattr('web.views.load_permissions', lambda: {'tester': {'allow_query': False, 'main': ['DB1']}})
+    monkeypatch.setattr('web.views.load_sql_servers', lambda: {'main': '10.0.0.1'})
+
+    client = app.test_client()
+    with client.session_transaction() as sess:
+        sess['user'] = 'tester'
+
+    resp = client.get('/query')
+    assert b'sorgu calistirma izniniz yok' in resp.data.lower()
+
+
 def test_update_shows_confirmation(monkeypatch):
-    monkeypatch.setattr('web.views.load_permissions', lambda: {'tester': {'main': ['DB1']}})
+    monkeypatch.setattr('web.views.load_permissions', lambda: {'tester': {'allow_query': True, 'main': ['DB1']}})
     monkeypatch.setattr('web.views.load_sql_servers', lambda: {'main': '10.0.0.1'})
 
     class FakeCursor:
@@ -112,7 +124,7 @@ def test_update_shows_confirmation(monkeypatch):
 
 
 def test_update_after_comment(monkeypatch):
-    monkeypatch.setattr('web.views.load_permissions', lambda: {'tester': {'main': ['DB1']}})
+    monkeypatch.setattr('web.views.load_permissions', lambda: {'tester': {'allow_query': True, 'main': ['DB1']}})
     monkeypatch.setattr('web.views.load_sql_servers', lambda: {'main': '10.0.0.1'})
 
     class FakeCursor:
@@ -153,7 +165,7 @@ def test_update_after_comment(monkeypatch):
 
 
 def test_delete_after_declare(monkeypatch):
-    monkeypatch.setattr('web.views.load_permissions', lambda: {'tester': {'main': ['DB1']}})
+    monkeypatch.setattr('web.views.load_permissions', lambda: {'tester': {'allow_query': True, 'main': ['DB1']}})
     monkeypatch.setattr('web.views.load_sql_servers', lambda: {'main': '10.0.0.1'})
 
     class FakeCursor:
@@ -194,7 +206,7 @@ def test_delete_after_declare(monkeypatch):
 
 
 def test_execute_query_uses_session(monkeypatch):
-    monkeypatch.setattr('web.views.load_permissions', lambda: {'tester': {'main': ['DB1']}})
+    monkeypatch.setattr('web.views.load_permissions', lambda: {'tester': {'allow_query': True, 'main': ['DB1']}})
     monkeypatch.setattr('web.views.load_sql_servers', lambda: {'main': '10.0.0.1'})
 
     executed = []

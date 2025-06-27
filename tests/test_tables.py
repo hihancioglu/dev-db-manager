@@ -9,7 +9,7 @@ def test_tables_requires_login():
 
 
 def test_tables_permission(monkeypatch):
-    monkeypatch.setattr('web.views.load_permissions', lambda: {'tester': {'main': ['DB2']}})
+    monkeypatch.setattr('web.views.load_permissions', lambda: {'tester': {'allow_query': True, 'main': ['DB2']}})
     monkeypatch.setattr('web.views.load_sql_servers', lambda: {'main': '10.0.0.1'})
     client = app.test_client()
     with client.session_transaction() as sess:
@@ -19,7 +19,7 @@ def test_tables_permission(monkeypatch):
 
 
 def test_tables_returns_list(monkeypatch):
-    monkeypatch.setattr('web.views.load_permissions', lambda: {'tester': {'main': ['DB1']}})
+    monkeypatch.setattr('web.views.load_permissions', lambda: {'tester': {'allow_query': True, 'main': ['DB1']}})
     monkeypatch.setattr('web.views.load_sql_servers', lambda: {'main': '10.0.0.1'})
 
     executed_ip = []

@@ -62,3 +62,18 @@ pytest -q
 ```
 
 Bağımlılıkların kurulu olduğundan emin olun.
+
+## Yapılandırma Güncellemesi
+
+`user_permissions.json` dosyasında her kullanıcı için yeni `allow_query` alanı eklenmiştir. Eski dosyaları uyumlu hale getirmek için her kullanıcı nesnesine bu anahtar eklenmelidir:
+
+```json
+{
+  "kullanici": {
+    "allow_query": true,
+    "main": ["OrnekDB"]
+  }
+}
+```
+
+Anahtar eksik olduğunda uygulama varsayılan olarak `true` kabul eder ancak yetkiyi kapatabilmek için dosyanın güncellenmesi gerekir.
