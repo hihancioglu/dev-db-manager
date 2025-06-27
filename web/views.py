@@ -927,12 +927,6 @@ def query_page():
             prod_dbs.append({'prefix': prefix, 'db': db})
 
     if not allow_query:
-        return redirect(url_for('query_page'))
-
-    if not allow_query:
-        return redirect(url_for('query_page'))
-
-    if not allow_query:
         return render_template(
             'query.html',
             username=username,
