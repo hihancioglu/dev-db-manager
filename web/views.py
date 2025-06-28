@@ -17,6 +17,15 @@ MAX_ROWS = 10000
 
 # Default allowed operations for new permissions entries
 DEFAULT_OPS = ["SELECT", "INSERT", "UPDATE", "DELETE"]
+
+# Tables that should have Dynamic Data Masking applied after restore
+MASK_TABLES = [
+    "CardAuthorities",
+    "ElectricManufacturerKeyModels",
+    "ElectricProgrammingKeyModels",
+    "ElectricAesKeyModels",
+    "ElectricUpdateKeyModels",
+]
 from web.paths import (
     ALLOWED_USERS_PATH,
     ADMIN_USERS_PATH,
@@ -169,6 +178,39 @@ def load_query_logs(limit=100):
         logger.warning("query log read failed: %s", e)
         return []
 
+# Apply Dynamic Data Masking to sensitive tables in the given database
+def apply_data_masking(dev_db: str):
+    try:
+        conn = get_conn(DEV_SQL)
+        cursor = conn.cursor()
+        cursor.execute(f"USE [{dev_db}]")
+        for tbl in MASK_TABLES:
+            try:
+                cursor.execute(
+                    "SELECT COUNT(1) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = ?",
+                    tbl,
+                )
+                if cursor.fetchone()[0] == 0:
+                    continue
+                cursor.execute(
+                    "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = ?",
+                    tbl,
+                )
+                for col_row in cursor.fetchall():
+                    col = col_row[0]
+                    try:
+                        cursor.execute(
+                            f"ALTER TABLE [{tbl}] ALTER COLUMN [{col}] ADD MASKED WITH (FUNCTION = 'default()')"
+                        )
+                    except Exception as e:
+                        if "already" not in str(e).lower():
+                            logger.warning("mask failed %s.%s: %s", tbl, col, e)
+            except Exception as e:
+                logger.warning("masking check failed for %s: %s", tbl, e)
+        conn.close()
+    except Exception as e:
+        logger.warning("masking connection failed for %s: %s", dev_db, e)
+
 def run_backup_restore(prod_db, dev_db, username, source_sql):
     try:
         active_jobs[dev_db] = {
@@ -224,7 +266,13 @@ def run_backup_restore(prod_db, dev_db, username, source_sql):
         while dev_cursor.nextset(): pass
         dev_conn.close()
 
-        # 🔹 STEP 5: Kullanıcıya db_owner yetkisi ver
+        # 🔹 STEP 5: Mask sensitive data if tables exist
+        try:
+            apply_data_masking(dev_db)
+        except Exception as e:
+            logger.warning("data masking failed: %s", e)
+
+        # 🔹 STEP 6: Kullanıcıya db_owner yetkisi ver
         try:
             domain_user = f"BAYLAN\\{username}"
             conn = get_conn(DEV_SQL)
