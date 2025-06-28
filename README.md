@@ -77,3 +77,20 @@ Bağımlılıkların kurulu olduğundan emin olun.
 ```
 
 Anahtar eksik olduğunda uygulama varsayılan olarak `true` kabul eder ancak yetkiyi kapatabilmek için dosyanın güncellenmesi gerekir.
+
+## Aktif İşler Yapısı
+
+Yedek alma ve geri yükleme gibi uzun süren işlemler bellek içindeki
+`active_jobs` sözlüğünde izlenir. Anahtar, hedef geliştirme veritabanı
+ismidir. Değer aşağıdaki alanları içerir:
+
+```python
+{
+    "stage": "backup" | "analyze" | "restore",
+    "percent": int,
+    "prod_db": "KaynakDB",
+    "source_sql": "10.0.0.1"
+}
+```
+
+`/progress` uç noktası bu bilgileri kullanarak işlemin durumunu döndürür.

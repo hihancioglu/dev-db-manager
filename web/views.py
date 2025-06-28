@@ -110,6 +110,12 @@ logger = logging.getLogger(__name__)
 
 active_job = None
 job_queue = deque()
+# Tracks long-running backup/restore jobs by target dev DB.
+# Each value contains:
+#   stage      → current step (backup, analyze or restore)
+#   percent    → progress percentage
+#   prod_db    → source database name
+#   source_sql → SQL server where backup is taken
 active_jobs = {}
 
 def is_admin():
@@ -165,7 +171,12 @@ def load_query_logs(limit=100):
 
 def run_backup_restore(prod_db, dev_db, username, source_sql):
     try:
-        active_jobs[dev_db] = {"stage": "backup", "percent": 0}
+        active_jobs[dev_db] = {
+            "stage": "backup",
+            "percent": 0,
+            "source_sql": source_sql,
+            "prod_db": prod_db,
+        }
 
         # 🔹 STEP 1: BACKUP
         prod_conn = get_conn(source_sql)
@@ -176,7 +187,7 @@ def run_backup_restore(prod_db, dev_db, username, source_sql):
         prod_conn.close()
 
         # 🔹 STEP 2: Get logical file list
-        active_jobs[dev_db] = {"stage": "analyze", "percent": 0}
+        active_jobs[dev_db].update({"stage": "analyze", "percent": 0})
         dev_conn = get_conn(DEV_SQL)
         dev_cursor = dev_conn.cursor()
         dev_cursor.execute(f"RESTORE FILELISTONLY FROM DISK = N'{bak_file}'")
@@ -203,7 +214,7 @@ def run_backup_restore(prod_db, dev_db, username, source_sql):
         move_sql = ",\n     ".join(move_clauses)
 
         # 🔹 STEP 4: RESTORE
-        active_jobs[dev_db] = {"stage": "restore", "percent": 0}
+        active_jobs[dev_db].update({"stage": "restore", "percent": 0})
         dev_cursor.execute(f"""
             RESTORE DATABASE [{dev_db}]
             FROM DISK = N'{bak_file}'
