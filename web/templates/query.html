@@ -149,10 +149,6 @@ function loadTableList() {
                 nameSpan.textContent = item.name;
                 nameSpan.title = item.name;
                 li.appendChild(nameSpan);
-                const badge = document.createElement('span');
-                badge.className = 'badge bg-secondary';
-                badge.textContent = item.type;
-                li.appendChild(badge);
                 li.addEventListener('click', () => loadColumns(item.name));
                 list.appendChild(li);
                 hintTables[item.name] = [];
