@@ -41,7 +41,15 @@
         <strong>Kuyruktaki İşler:</strong>
         <ul class="mb-0">
             {% for job in job_queue %}
-            <li>{{ job.prod_db }} → {{ job.dev_db }} ({{ job.username }})</li>
+            <li>
+                {{ job.prod_db }} → {{ job.dev_db }} ({{ job.username }})
+                {% if job.username == username %}
+                <form method="post" action="/cancel-queued" class="d-inline ms-2">
+                    <input type="hidden" name="dev_db" value="{{ job.dev_db }}">
+                    <button type="submit" class="btn btn-sm btn-outline-danger">İptal</button>
+                </form>
+                {% endif %}
+            </li>
             {% endfor %}
         </ul>
     </div>
