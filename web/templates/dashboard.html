@@ -32,6 +32,7 @@
     {% if active_job %}
     <div class="alert alert-info">
         <strong>Aktif İşlem:</strong> {{ active_job.prod_db }} → {{ active_job.dev_db }} ({{ active_job.username }})
+        <span id="active-job-status" class="ms-2"></span>
     </div>
     {% endif %}
 
@@ -145,6 +146,29 @@ function updateProgress(dev_db) {
     updateProgress("{{ dev }}");
 {% endfor %}
 </script>
+{% if active_job %}
+<script>
+(function pollActiveJob() {
+    const el = document.getElementById('active-job-status');
+    function poll() {
+        fetch('/progress?dev_db={{ active_job.dev_db }}')
+            .then(res => res.json())
+            .then(data => {
+                if (el) {
+                    const percent = data.percent_complete || 0;
+                    const stage = data.stage || '';
+                    el.textContent = `${stage}: %${percent}`;
+                }
+                if (data.status !== 'done') {
+                    setTimeout(poll, 3000);
+                }
+            })
+            .catch(err => console.error(err));
+    }
+    poll();
+})();
+</script>
+{% endif %}
 <script>
 let previousDevDbs = {{ dev_dbs | tojson }};
 
